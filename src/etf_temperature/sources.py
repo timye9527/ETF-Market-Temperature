@@ -51,13 +51,21 @@ def fetch_yahoo(tickers, years: int = 5, pause: float = 0.4) -> dict[str, pd.Dat
     failed = []
     for t in tickers:
         url = f"https://query1.finance.yahoo.com/v8/finance/chart/{t}"
-        try:
-            r = s.get(url, params={"range": f"{years}y", "interval": "1d",
-                                   "events": "div,splits", "includeAdjustedClose": "true"}, timeout=30)
-            r.raise_for_status()
-            out[t] = parse_yahoo_chart(r.json())
-        except Exception as exc:  # one bad ticker must not sink the run; engine reports it as missing
-            failed.append(f"{t}: {exc}")
+        err = None
+        for attempt in range(3):
+            try:
+                host = ("query1", "query2")[attempt % 2]
+                r = s.get(url.replace("query1", host), params={"range": f"{years}y", "interval": "1d",
+                          "events": "div,splits", "includeAdjustedClose": "true"}, timeout=30)
+                r.raise_for_status()
+                out[t] = parse_yahoo_chart(r.json())
+                err = None
+                break
+            except Exception as exc:  # one bad ticker must not sink the run; engine reports it as missing
+                err = exc
+                time.sleep(2 * (attempt + 1))
+        if err is not None:
+            failed.append(f"{t}: {err}")
         time.sleep(pause)
     if len(failed) > 0.2 * len(tickers):
         raise RuntimeError("too many tickers failed:\n" + "\n".join(failed))

@@ -1,7 +1,8 @@
 name: Daily temperature
 
-# Runs the pipeline on real EOD data after the US close, commits the new site data,
-# then deploys site/ to GitHub Pages (enable Pages → Source: GitHub Actions once).
+# Pulls real EOD data after the US close, recomputes temperatures and commits
+# site/data.js. A second job publishes site/ to GitHub Pages when Pages is enabled
+# (Settings → Pages → Source: GitHub Actions; private repos need a paid plan).
 on:
   schedule:
     - cron: "40 22 * * 1-5"   # 22:40 UTC, after the 16:00 ET close
@@ -34,7 +35,8 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add site/data.js data/snapshots/latest.json
           git diff --cached --quiet || git commit -m "data: daily temperature $(date -u +%F)"
-          git push
+          git pull --rebase origin main
+          git push origin HEAD:main
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
@@ -42,6 +44,7 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    continue-on-error: true   # data is already committed even if Pages is not enabled yet
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
