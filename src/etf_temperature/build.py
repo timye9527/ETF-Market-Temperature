@@ -18,7 +18,7 @@ from pathlib import Path
 import pandas as pd
 
 from . import sources
-from .engine import BANDS, FACTORS, Engine, band, risk_appetite
+from .engine import BANDS, FACTORS, Engine, band, forward_stats, risk_appetite
 from .universe import load
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -127,13 +127,14 @@ def build_payload(u, eng: Engine, mode: str, source: str) -> dict:
             "bands": [{"max": hi, "code": c, "label": lb} for hi, c, lb in BANDS],
         },
         "dates": hist_dates, "nodes": nodes, "families": fams, "etfs": etfs, "risk": risk,
+        "research": forward_stats(eng),
     }
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--source", choices=["demo", "yahoo", "stooq"], default="demo")
-    ap.add_argument("--years", type=int, default=5)
+    ap.add_argument("--years", type=int, default=10)
     args = ap.parse_args(argv)
 
     u = load()

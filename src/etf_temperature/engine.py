@@ -11,6 +11,7 @@ import pandas as pd
 
 WINDOW = 252          # percentile look-back
 MIN_PERIODS = 126     # no score with less history than this
+SMOOTH_DAYS = 3        # temperature smoothing window
 FACTORS = ["trend", "volume", "bullbear", "rs", "breadth"]
 BANDS = [  # MASTER_PROMPT §16 thresholds; to be calibrated (D-008 / Q6)
     (15, "EXTREME_COLD", "极冷"), (35, "COLD", "冷"), (45, "COOL", "偏冷"),
@@ -235,7 +236,10 @@ class Engine:
         # Pass 3: temperature.
         for rec in self.node.values():
             fs = [rec["series"][f] for f in FACTORS if f in rec["series"]]
-            rec["temperature"] = pd.concat(fs, axis=1).mean(axis=1, skipna=True)
+            raw = pd.concat(fs, axis=1).mean(axis=1, skipna=True)
+            rec["temperature_raw"] = raw
+            # 3-day mean: one noisy session should not swing a state reading (D-021).
+            rec["temperature"] = raw.rolling(SMOOTH_DAYS, min_periods=1).mean().where(raw.notna())
             rec["coverage"] = pd.concat(fs, axis=1).notna().sum(axis=1)
 
     def run(self):
@@ -272,3 +276,42 @@ def risk_appetite(engine: Engine) -> dict:
         comps.append({"pair": "VIX ETP 成交", "label": "波动率对冲成交（反向）", "meaning": "恐慌对冲需求越低越偏 Risk-on", "series": s})
     total = pd.concat(series, axis=1).mean(axis=1)
     return {"score": total, "components": comps}
+
+
+# ───────────────────────── Research layer ─────────────────────────
+# What happened next, by temperature bucket. Descriptive statistics only; never fed
+# back into the temperature (MASTER_PROMPT §17).
+def forward_stats(engine: Engine, horizons=(5, 20), edges=(0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100.01)) -> dict:
+    rows = []
+    for nid, rec in engine.node.items():
+        if engine.u.nodes[nid].get("mode") != "DIRECTIONAL" or rec.get("price") is None:
+            continue
+        p, t = rec["price"], rec["temperature"]
+        frame = {"t": t}
+        for h in horizons:
+            frame[f"f{h}"] = (p.shift(-h) / p - 1) * 100
+        rows.append(pd.DataFrame(frame).dropna(subset=["t"]).assign(node=nid))
+    df = pd.concat(rows)
+    df["bucket"] = pd.cut(df["t"], list(edges), right=False, include_lowest=True)
+    out = []
+    for b, g in df.groupby("bucket", observed=False):
+        row = {"lo": int(b.left), "hi": min(int(b.right), 100), "days": int(len(g)), "nodes": int(g["node"].nunique())}
+        for h in horizons:
+            x = g[f"f{h}"].dropna()
+            row[f"f{h}"] = None if len(x) < 30 else {
+                "n": int(len(x)), "mean": round(float(x.mean()), 2), "median": round(float(x.median()), 2),
+                "hit": round(float((x > 0).mean() * 100), 1), "p10": round(float(x.quantile(.1)), 2),
+                "p90": round(float(x.quantile(.9)), 2)}
+        out.append(row)
+    span = (df.index.min(), df.index.max())
+    return {"buckets": out, "horizons": list(horizons), "n_nodes": int(df["node"].nunique()),
+            "start": span[0].strftime("%Y-%m-%d"), "end": span[1].strftime("%Y-%m-%d"),
+            "band_share": {code: round(float(((df["t"] >= lo) & (df["t"] < hi)).mean() * 100), 1)
+                           for (lo, hi, code) in _band_ranges()}}
+
+
+def _band_ranges():
+    lo = 0
+    for hi, code, _ in BANDS:
+        yield lo, (hi if hi < 100 else 100.01), code
+        lo = hi

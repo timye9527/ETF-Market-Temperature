@@ -117,6 +117,16 @@ nav button:hover { color: var(--ink); }
 .chart-box { overflow-x: auto; }
 .chart-box svg text { fill: var(--ink-2); font: 11px var(--f-body); }
 .chart-box svg .ax { stroke: var(--line); }
+.heat { display: grid; gap: 2px; min-width: 640px; }
+.heat .hr { display: grid; grid-template-columns: 120px repeat(var(--cols), minmax(0, 1fr)) 40px; gap: 1px; align-items: center; }
+.heat .hl { font-size: 12px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 8px; border: 0; background: none; text-align: left; cursor: pointer; }
+.heat .hc { height: 18px; }
+.heat .hv { font: 700 15px var(--f-display); text-align: right; }
+.heat .hx { font: 10.5px var(--f-mono); color: var(--ink-3); }
+.rbar { display: grid; grid-template-columns: 70px minmax(0, 1fr) 64px 56px 64px; gap: 10px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); font-size: 12.5px; }
+.rbar .z { position: relative; height: 14px; }
+.rbar .z::before { content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--ink-3); }
+.rbar .z b { position: absolute; top: 2px; height: 10px; border-radius: 2px; }
 .chain { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; }
 .chain .lnk { border: 1px solid var(--line); background: var(--surface); border-radius: var(--r); padding: 8px 12px; min-width: 120px; cursor: pointer; text-align: left; }
 .chain .arrow { align-self: center; color: var(--ink-3); font-family: var(--f-mono); }
@@ -193,6 +203,7 @@ tr.fam td { background: var(--surface-2); font-weight: 500; white-space: normal;
       <button data-view="overview">总览</button>
       <button data-view="rotation">资金轮动</button>
       <button data-view="tree">市场树</button>
+      <button data-view="research">研究</button>
       <button data-view="method">方法</button>
     </nav>
     <span class="asof" id="asof"></span>
@@ -365,7 +376,21 @@ function rotation() {
   });
   svg += "</svg>";
   const chain = ["EQUITY/GLOBAL", "EQUITY/US", "EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY", "EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY/SEMICONDUCTORS"];
+  const HEAT = ["EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY", "EQUITY/US/SECTOR/COMMUNICATION_SERVICES", "EQUITY/US/SECTOR/CONSUMER_DISCRETIONARY",
+    "EQUITY/US/SECTOR/FINANCIALS", "EQUITY/US/SECTOR/INDUSTRIALS", "EQUITY/US/SECTOR/HEALTH_CARE", "EQUITY/US/SECTOR/ENERGY",
+    "EQUITY/US/SECTOR/MATERIALS", "EQUITY/US/SECTOR/CONSUMER_STAPLES", "EQUITY/US/SECTOR/UTILITIES", "EQUITY/US/SECTOR/REAL_ESTATE",
+    "EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY/SEMICONDUCTORS", "EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY/SOFTWARE",
+    "EQUITY/US/SECTOR/FINANCIALS/BANKS/REGIONAL_BANKS", "EQUITY/US/SECTOR/HEALTH_CARE/BIOTECHNOLOGY",
+    "PRECIOUS_METALS/GOLD", "BOND/US/TREASURY/LONG", "CRYPTO/BITCOIN"].filter(id => N[id]?.hist);
+  const C = 60, hd = D.dates.slice(-C);
+  const heat = `<div class="heat" style="--cols:${C}">${HEAT.map(id => {
+    const h = N[id].hist.slice(-C);
+    return `<div class="hr"><button class="hl" data-node="${esc(id)}">${esc(zh(id))}</button>${h.map((v, i) =>
+      `<span class="hc" style="background:${v == null ? "var(--surface-2)" : tcol(bandOf(v))}" title="${esc(zh(id))} ${hd[i]}: ${fmt(v)}°"></span>`).join("")}<span class="hv num">${fmt(N[id].temp)}</span></div>`;
+  }).join("")}<div class="hr"><span></span>${hd.map((d, i) => `<span class="hx">${i % 20 === 0 ? d.slice(5) : ""}</span>`).join("")}<span></span></div></div>`;
   return demoBanner() + `
+  <section class="sec"><div class="sec-h"><h2>轮动热力图</h2><span class="muted">近 ${C} 个交易日每天的温度区间 · 悬停看数值</span></div>
+    <div class="panel chart-box">${heat}</div></section>
   <section class="sec"><div class="sec-h"><h2>风险偏好链</h2><span class="muted">每一级的相对强弱（RS）· &gt;60 说明资金在向这一级集中</span></div>
     <div class="chain">${chain.map((id, i) => `${i ? '<span class="arrow">→</span>' : ""}<button class="lnk" data-node="${id}">
       <div class="eyebrow">${esc(zh(id))}</div><div style="display:flex;gap:10px;align-items:baseline;margin-top:4px"><b class="num">${fmt(N[id].temp)}°</b>
@@ -482,9 +507,30 @@ function nodeView(id) {
     <tbody>${fids.map(etfRows).join("")}</tbody></table></div></section>` : ""}`;
 }
 
+function research() {
+  const R = D.research;
+  if (!R) return `<p class="muted" style="margin-top:20px">还没有研究数据。</p>`;
+  const H = R.horizons;
+  const maxAbs = Math.max(0.5, ...R.buckets.flatMap(b => H.map(h => Math.abs(b["f" + h]?.mean ?? 0))));
+  const block = h => `<div class="panel"><div class="sec-h"><h2>之后 ${h} 个交易日</h2><span class="muted">平均涨跌 · 上涨概率 · 样本天数</span></div>
+    ${R.buckets.map(b => { const s = b["f" + h]; const w = s ? Math.abs(s.mean) / maxAbs * 50 : 0;
+      return `<div class="rbar"><span class="num mono">${b.lo}–${b.hi}°</span>
+        <div class="z">${s ? `<b style="left:${s.mean >= 0 ? 50 : 50 - w}%;width:${w}%;background:${tcol(bandOf((b.lo + b.hi) / 2))}"></b>` : ""}</div>
+        <span class="num r" style="text-align:right">${s ? sgn(s.mean, 2) + "%" : "样本不足"}</span>
+        <span class="num muted" style="text-align:right">${s ? s.hit + "%" : ""}</span>
+        <span class="num muted mono" style="text-align:right">${s ? s.n.toLocaleString() : b.days}</span></div>`; }).join("")}</div>`;
+  const share = D.meta.bands.map((b, i) => `<span class="chip" style="--c:var(--t${i})"><i></i>${BAND[b.code][0]} ${R.band_share[b.code]}%</span>`).join("");
+  return demoBanner() + `<section class="sec"><div class="sec-h"><h2>温度之后发生了什么</h2><span class="signal-tag">研究层 RESEARCH</span></div>
+    <p class="prose" style="margin:0">把 ${R.n_nodes} 个方向型节点在 ${R.start} 至 ${R.end} 的每日温度按 10° 分组，统计各组之后的价格涨跌。这是历史描述，不是预测：相邻交易日的样本高度重叠，有效样本远少于显示的天数；不同资产被混在一起统计。</p></section>
+  <section class="two" style="margin-top:16px">${H.map(block).join("")}</section>
+  <section class="sec"><div class="sec-h"><h2>温度区间实际出现的频率</h2><span class="muted">用于校准区间阈值</span></div>
+    <div class="legend">${share}</div>
+    <p class="muted" style="font-size:12.5px;margin:0">如果“极热”“极冷”出现得太少或太多，说明区间阈值需要按历史分布重新划分（待办 Q6）。</p></section>`;
+}
+
 function method() {
   return `<section class="sec prose"><div class="sec-h"><h2>温度怎么来的</h2></div>
-  <p>每个市场节点（例如“半导体”）都由跟踪它的 ETF 读数合成一个 0–100 的温度。每个读数都和该资产<b>自己过去一年</b>的历史比较，所以 80° 的意思是“比它自己一年里大多数时候都热”，不同资产之间的温度不代表同一种风险。</p>
+  <p>每个市场节点（例如“半导体”）都由跟踪它的 ETF 读数合成一个 0–100 的温度，取最近 3 个交易日的平均，避免单日噪音。每个读数都和该资产<b>自己过去一年</b>的历史比较，所以 80° 的意思是“比它自己一年里大多数时候都热”，不同资产之间的温度不代表同一种风险。</p>
   <h3>五个因子</h3>
   <p><b>趋势</b>：价格相对 20/50/200 日均线的位置、5/20/60 日动量、在 52 周区间中的位置。<b>成交</b>：5 日平均美元成交额在一年中的分位；放量上涨加温，放量下跌降温，缩量接近中性。无方向的“活跃度”单独显示，用来区分“冷且恐慌”和“冷且无人问津”。<b>多空杠杆</b>：杠杆多头与空头 ETF 的成交额，按杠杆倍数折算成敞口后比较。<b>相对强弱</b>：相对上一级基准（例如半导体对科技、科技对美股）。<b>广度</b>：子板块中站上均线、20 日上涨、创新高的比例，只对有 5 个以上子板块的节点计算。</p>
   <h3>同一个指数只算一次</h3>
@@ -506,6 +552,7 @@ function render() {
   if (view === "node" && current && N[current]) h = nodeView(current);
   else if (view === "rotation") h = rotation();
   else if (view === "tree") h = tree();
+  else if (view === "research") h = research();
   else if (view === "method") h = method();
   else h = overview();
   app.innerHTML = h + `<footer class="foot"><span>ETF 市场温度计 · 温度描述市场状态，不构成投资建议。</span><span class="mono">${D.meta.n_etfs} ETFs · ${D.meta.n_families} families · ${D.meta.n_nodes} nodes · as of ${D.meta.asof}</span></footer>`;

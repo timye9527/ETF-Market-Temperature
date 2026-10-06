@@ -1,5 +1,7 @@
 # ETF Market Temperature / ETF 市场温度计
 
+**网站：https://timye9527.github.io/ETF-Market-Temperature/** （每个交易日美股收盘后自动更新）
+
 用流动性最好的 ETF 作为“传感器”，把全球市场压缩成一棵可解释的市场树，每个节点（US Equity、Technology、Semiconductors、Gold、Treasury、Hong Kong…）一个 **0–100 的温度**，并能拆解成 Trend / Volume / Bull-Bear / Relative Strength / Breadth 五个因子。
 
 > 温度描述市场**状态**，不是买卖信号、预测或投资建议。（TEMPERATURE = STATE，SIGNAL = INTERPRETATION，TRADE = DECISION）
@@ -17,10 +19,10 @@
 - Universe 校验器 + 测试：`src/etf_temperature/universe.py`、`tests/`
 
 ## 网站（V1）
-- `site/index.html` + `site/data.js`：总览温度板、风险偏好（解读层）、资金轮动（5/20 日温度变化）、市场树、节点详情（因子拆解、温度历史、ETF Family 表、杠杆自动校验）、方法说明。
+- `site/index.html` + `site/data.js`：总览温度板、风险偏好（解读层）、资金轮动（60 日热力图 + 5/20 日温度变化）、市场树、研究（温度分组后的历史表现）、节点详情（因子拆解、温度历史、ETF Family 表、杠杆自动校验）、方法说明。
 - 本地查看：直接用浏览器打开 `site/index.html`。
 - 数据：`PYTHONPATH=src python3 -m etf_temperature.build --source demo|yahoo`。`site/data.js` 由 GitHub Actions 用 **Yahoo 真实 EOD 行情**生成（首次运行：2026-10-06，数据截至 2026-10-05 收盘）。`--source demo` 只用于离线开发，页面会显示“演示数据”提示。
-- 真实数据：`.github/workflows/daily.yml` 每个交易日收盘后用真实行情重算并部署到 GitHub Pages（需要在仓库 Settings → Pages 把 Source 设为 GitHub Actions；私有仓库使用 Pages 需要付费计划）。
+- 真实数据：`.github/workflows/daily.yml` 每个交易日收盘后（以及每次代码推送后）用真实行情重算，提交数据并发布到 `gh-pages` 分支。
 
 ## 正在进行（Phase 1b）
 - 逐只对照基金官网核验 benchmark / 杠杆倍数 / Family 归属（`verified` 字段）

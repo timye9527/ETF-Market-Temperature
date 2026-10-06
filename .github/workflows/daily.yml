@@ -1,8 +1,7 @@
 name: Daily temperature
 
-# Pulls real EOD data after the US close, recomputes temperatures and commits
-# site/data.js. A second job publishes site/ to GitHub Pages when Pages is enabled
-# (Settings → Pages → Source: GitHub Actions; private repos need a paid plan).
+# Pulls real EOD data after the US close, recomputes temperatures, commits
+# site/data.js to main and publishes site/ to the gh-pages branch (GitHub Pages).
 on:
   schedule:
     - cron: "40 22 * * 1-5"   # 22:40 UTC, after the 16:00 ET close
@@ -16,8 +15,6 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 concurrency:
   group: daily-temperature
@@ -43,17 +40,11 @@ jobs:
           git diff --cached --quiet || git commit -m "data: daily temperature $(date -u +%F)"
           git pull --rebase origin main
           git push origin HEAD:main
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    continue-on-error: true   # data is already committed even if Pages is not enabled yet
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Publish site to gh-pages (GitHub Pages)
+        run: |
+          cd site
+          touch .nojekyll
+          git init -q -b gh-pages
+          git add -A
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -q -m "deploy: $(date -u +%FT%H:%MZ)"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" gh-pages
