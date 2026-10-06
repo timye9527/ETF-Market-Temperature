@@ -18,17 +18,21 @@
 - 原始 Prompt：`prompts/MASTER_PROMPT.md`
 - Universe 校验器 + 测试：`src/etf_temperature/universe.py`、`tests/`
 
-## 网站（V1）
-- `site/index.html` + `site/data.js`：总览温度板、风险偏好（解读层）、资金轮动（60 日热力图 + 5/20 日温度变化）、市场树、研究（温度分组后的历史表现）、节点详情（因子拆解、温度历史、ETF Family 表、杠杆自动校验）、方法说明。
-- 本地查看：直接用浏览器打开 `site/index.html`。
-- 数据：`PYTHONPATH=src python3 -m etf_temperature.build --source demo|yahoo`。`site/data.js` 由 GitHub Actions 用 **Yahoo 真实 EOD 行情**生成（首次运行：2026-10-06，数据截至 2026-10-05 收盘）。`--source demo` 只用于离线开发，页面会显示“演示数据”提示。
-- 真实数据：`.github/workflows/daily.yml` 每个交易日收盘后（以及每次代码推送后）用真实行情重算，提交数据并发布到 `gh-pages` 分支。
+## 当前版本：V2（2026-10-06）
+- **温度 = 相对自身趋势的冷热**：先用 6 个月与 1 年回归找到趋势，再看偏离；稳定上涨显示“强上升 + 中性”，加速冲顶才会“极热”。温度是自身 5 年百分位，极热/极冷各约占 5% 的日子。
+- **五个维度**：偏离趋势 30%、动量加速 20%、拥挤度 20%（成交额 + 杠杆块）、广度 15%、相对强弱偏离 15%；极端需“确认清单”≥3 条持续 3 日。
+- **周期资格**：自动 5 项检验，Owner 在 `data/eligibility.yaml` 复核；参考动作只对合格节点给出。
+- **ETF 选取**：候选 213 只，每类按成交额取 Top 20，加节点覆盖与杠杆块；约 60 只大市值股只用于广度与回填。
+- **网站**：总览（温度板按产业链、趋势×温度四象限）、资金轮动、市场树、ETF 池、研究（按周期资格分组）、方法、节点详情（参考动作、确认清单、周期资格、杠杆块、ETF 映射、映射股票）。
+- 设计：`docs/framework-v2.md`；决策：`DECISIONS.md` D-024 起。
 
-## 正在进行：Framework V2（待确认）
-- `docs/framework-v2.md`：冷热通用标准（5 年自身分位）、周期资格（排除价值陷阱）、ETF 映射、成分股广度、参考动作。
-- `data/universe_v2_candidates.yaml`：存储（DRAM 系列）、光刻设备（EUV）、数据中心、电网、核电等候选 ETF。
+## 待办
+- Owner 复核周期资格（`data/eligibility.yaml`）
+- 逐只核验 ETF 元数据（目前依赖杠杆自动校验）
+- ETF 持仓文件抓取与 ETF 重叠度矩阵
+- 港股本地 ETF（下一版之后）
 
-## 正在进行（Phase 1b）
+## 以前的待办（Phase 1b）
 - 逐只对照基金官网核验 benchmark / 杠杆倍数 / Family 归属（`verified` 字段）
 - 等待 Owner 决定待决问题 Q1–Q8（见 `docs/phase1-review.md` §7），尤其 Q1：温度是否有方向
 - 选定数据源
