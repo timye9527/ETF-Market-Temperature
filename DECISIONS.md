@@ -62,3 +62,24 @@ V1：97 只。Tier 1+2 参与计算，Tier 3 只为自身节点出低置信度�
 
 ### D-014 · 2026-10-06 · ACCEPTED — 独立 repository
 本项目只在 `timye9527/etf-market-temperature` 开发，与 AI-supply-chain 完全分离。
+
+---
+
+### D-015 · 2026-10-06 · ACCEPTED（临时）— 按 D-008 方案开工
+Owner 指示“先继续跑，做出整个网站”，Q1 尚未回答。V1 先按 D-008 实现：温度有方向；Volume 以 Directional Attention 进入温度；无方向的“活跃度”并排显示。
+实现细节：方向不是 ±1 的符号，而是 `clip(5 日收益 / 其 252 日标准差, −1, 1)`，避免平淡的一周在 ±1 之间跳动。Owner 若在 Q1 选择“激烈程度”，只需改 `engine.volume_scores`。
+
+### D-016 · 2026-10-06 · ACCEPTED — 杠杆成员的自动一致性校验（修订 D-013）
+人工核验之前，杠杆/反向成员若满足：近 252 日日收益对核心 ETF 回归 β 在目标倍数 ±15% 以内且 R² ≥ 0.85，则可以进入 Bull/Bear 因子。
+它验证的是“方向 × 倍数 × Family 归属”在数据上成立，不验证 benchmark 名称；人工核验仍是 Phase 1b 必做项。页面上逐只显示 β、R² 与是否通过。
+
+### D-017 · 2026-10-06 · ACCEPTED — 演示数据模式
+开发环境无法访问行情源（网络策略拒绝 stooq.com、query1.finance.yahoo.com、api.tiingo.com）。为了在无数据时也能开发与测试引擎和网站，提供 `--source demo`：确定性的合成行情（市场因子 + 节点因子 + 由核心收益推导的杠杆成员 + 对涨跌有反应的成交额）。
+所有由演示数据生成的页面都显示“演示数据，不代表真实市场”横幅。演示数据只用于开发，不用于任何研究结论或区间校准。
+
+### D-018 · 2026-10-06 · ACCEPTED（原型期）— 真实数据先用 Yahoo chart 接口，由 GitHub Actions 每日运行
+`.github/workflows/daily.yml` 在美股收盘后运行 `--source yahoo`，提交 `site/data.js` 并部署 GitHub Pages。
+Yahoo 接口非官方、条款不允许商用：只用于个人原型。商业化之前必须换成有授权的数据源（Q2）。
+
+### D-019 · 2026-10-06 · ACCEPTED — 已知性质：温度衡量“相对自身历史的异常程度”
+匀速长期上涨的资产，其均线偏离与动量会成为常态，分位回落到中间（见测试 `test_steady_trend_regresses_toward_middle`）。这是自身历史归一化的直接结果，页面“方法”中向用户说明。

@@ -16,19 +16,28 @@
 - 原始 Prompt：`prompts/MASTER_PROMPT.md`
 - Universe 校验器 + 测试：`src/etf_temperature/universe.py`、`tests/`
 
+## 网站（V1）
+- `site/index.html` + `site/data.js`：总览温度板、风险偏好（解读层）、资金轮动（5/20 日温度变化）、市场树、节点详情（因子拆解、温度历史、ETF Family 表、杠杆自动校验）、方法说明。
+- 本地查看：直接用浏览器打开 `site/index.html`。
+- 数据：`PYTHONPATH=src python3 -m etf_temperature.build --source demo|yahoo`。当前仓库内是**演示数据**（开发环境无法访问行情源，见 D-017），页面顶部有明显提示。
+- 真实数据：`.github/workflows/daily.yml` 每个交易日收盘后用真实行情重算并部署到 GitHub Pages（需要在仓库 Settings → Pages 把 Source 设为 GitHub Actions；私有仓库使用 Pages 需要付费计划）。
+
 ## 正在进行（Phase 1b）
 - 逐只对照基金官网核验 benchmark / 杠杆倍数 / Family 归属（`verified` 字段）
 - 等待 Owner 决定待决问题 Q1–Q8（见 `docs/phase1-review.md` §7），尤其 Q1：温度是否有方向
 - 选定数据源
 
-## 下一步（Phase 2）
-数据管道（EOD OHLCV）→ 五因子计算 → 节点聚合与每日快照 → 3 年历史回放与区间校准 → 最简报告页面。
+## 下一步
+- 第一次用真实数据运行（GitHub Actions），检查每个节点的温度是否合理
+- 用 3–5 年真实历史校准温度区间（Q6）
+- 人工核验 97 只 ETF；Memory 节点寻找合格 ETF
 
 ## 快速使用
 ```bash
 pip install -r requirements.txt
 python3 src/etf_temperature/universe.py          # 校验 taxonomy + universe
 python3 -m unittest discover -s tests            # 运行测试
+PYTHONPATH=src python3 -m etf_temperature.build --source demo   # 生成网站数据
 ```
 
 ## 目录

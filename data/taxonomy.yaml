@@ -8,6 +8,7 @@
 # - mode:       DIRECTIONAL = 温度越高 = 该资产价格状态越强；REFERENCE = 只作为参照/风险偏好输入，不在首页显示温度
 # - anchor_family: 节点自身没有直接挂 Family 时，用哪个 Family 代表它的价格（Trend / RS / Volume）
 # - rs_benchmark:  Relative Strength 的比较对象（另一个节点）；为空 = 不计算 RS
+# - breadth_basket: Breadth 的样本：一个 DIMENSION 节点（取其已打分子节点）或节点列表；未设置 = 无 Breadth
 # - status:     ACTIVE | NO_COVERAGE（暂无合格 ETF，不显示温度，绝不伪造）
 
 schema_version: 1
@@ -16,9 +17,9 @@ nodes:
   - {id: MARKET, name: Global Multi-Asset, level: ROOT, scored: false}
 
   # ───────────────────────── EQUITY ─────────────────────────
-  - {id: EQUITY, name: Equity, level: ASSET_CLASS, scored: true, mode: DIRECTIONAL, anchor_family: ACWI_GLOBAL}
+  - {id: EQUITY, name: Equity, level: ASSET_CLASS, scored: true, mode: DIRECTIONAL, anchor_family: ACWI_GLOBAL, breadth_basket: [EQUITY/US, EQUITY/HONG_KONG, EQUITY/CHINA, EQUITY/JAPAN, EQUITY/EUROPE, EQUITY/INDIA, EQUITY/TAIWAN, EQUITY/KOREA, EQUITY/EMERGING_MARKETS]}
   - {id: EQUITY/GLOBAL, name: Global Equity, level: REGION, scored: true, mode: DIRECTIONAL, anchor_family: ACWI_GLOBAL}
-  - {id: EQUITY/US, name: US Equity, level: REGION, scored: true, mode: DIRECTIONAL, anchor_family: SP500_US, rs_benchmark: EQUITY/GLOBAL}
+  - {id: EQUITY/US, name: US Equity, level: REGION, scored: true, mode: DIRECTIONAL, anchor_family: SP500_US, rs_benchmark: EQUITY/GLOBAL, breadth_basket: EQUITY/US/SECTOR}
   - {id: EQUITY/US/BROAD, name: US Broad Market, level: DIMENSION, scored: false}
   - {id: EQUITY/US/BROAD/TOTAL_MARKET, name: US Total Market, level: SEGMENT, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US}
   - {id: EQUITY/US/BROAD/SP500, name: S&P 500, level: SEGMENT, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/GLOBAL}
