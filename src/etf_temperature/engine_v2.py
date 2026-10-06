@@ -57,8 +57,11 @@ def mean_of(series: list[pd.Series], weights: list[float] | None = None) -> pd.S
     df = pd.concat(series, axis=1)
     if weights is None:
         return df.mean(axis=1)
+    # Skip missing inputs and re-normalise the remaining weights (a young fund has no
+    # acceleration reading yet; that must not blank the whole composite).
     w = pd.DataFrame(np.tile(weights, (len(df), 1)), index=df.index).where(df.notna().to_numpy())
-    return (df.to_numpy() * w.fillna(0).to_numpy()).sum(axis=1) / w.sum(axis=1).replace(0, np.nan)
+    return pd.Series((df.fillna(0).to_numpy() * w.fillna(0).to_numpy()).sum(axis=1), index=df.index) \
+        / w.sum(axis=1).replace(0, np.nan)
 
 
 def regression(logp: pd.Series, w: int) -> dict[str, pd.Series]:
@@ -405,8 +408,11 @@ class EngineV2:
                              "cold_med120": None if mc is None else round(mc, 1),
                              "hot_med120": None if mh is None else round(mh, 1)},
                    "label": "冷之后好过热之后（120 日中位数）"},
-            "T4": {"pass": rs_slope is None or rs_slope > -5, "value": None if rs_slope is None else round(rs_slope, 1),
-                   "label": "未长期跑输上级（5 年相对斜率 > −5%/年）"},
+            # Lagging the index is not value destruction (2021–26 mega-cap tech beat almost every
+            # sector by >5%/yr). Fail only on severe lag AND an absolute return below cash.
+            "T4": {"pass": rs_slope is None or rs_slope > -10 or (cagr is not None and cagr >= 0.03),
+                   "value": None if rs_slope is None else round(rs_slope, 1),
+                   "label": "未在严重跑输的同时绝对回报低于现金（5 年相对 < −10%/年 且 年化 < 3%）"},
             "T5": {"pass": not instrument, "label": "不是期货展期/波动率工具"},
         }
         if not tests["T5"]["pass"]:

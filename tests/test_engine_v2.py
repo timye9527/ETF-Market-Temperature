@@ -48,6 +48,26 @@ class TrendRelativeTest(unittest.TestCase):
         self.assertEqual(v2.band(96), "EXTREME_HOT")
 
 
+class MissingInputTest(unittest.TestCase):
+    def test_weighted_mean_skips_missing(self):
+        a = pd.Series([10.0, 10.0], index=IDX[:2])
+        b = pd.Series([np.nan, 30.0], index=IDX[:2])
+        out = v2.mean_of([a, b], [0.5, 0.5])
+        self.assertEqual(list(out), [10.0, 20.0])
+
+    def test_young_funds_still_get_a_temperature(self):
+        # Real-data regression: IBIT (2024) and DRAM (2026-04) left Bitcoin and Memory blank.
+        u = load()
+        bars = make_demo(u, years=10)
+        for t, start in {"IBIT": "2024-01-11", "FBTC": "2024-01-11", "GBTC": "2024-01-11", "ARKB": "2024-01-11",
+                         "BITO": "2021-10-20", "DRAM": "2026-04-02", "DRAL": "2026-06-25", "RAM": "2026-06-24",
+                         "RAMZ": "2026-07-28"}.items():
+            bars[t] = bars[t].loc[start:]
+        e = v2.EngineV2(restrict(u, set(u.etfs)), bars).run()
+        for nid in ("CRYPTO/BITCOIN", "EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY/SEMICONDUCTORS/MEMORY"):
+            self.assertTrue(e.node[nid]["temp"].notna().iloc[-1], nid)
+
+
 class ActionTest(unittest.TestCase):
     def test_cyclical_confirmed_extreme_hot_trims(self):
         self.assertEqual(v2.reference_action("CYCLICAL", "EXTREME_HOT", "HOT", 95), "TRIM")
