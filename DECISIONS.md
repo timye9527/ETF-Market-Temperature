@@ -98,3 +98,17 @@ GitHub Actions 首次运行成功：97/97 只 ETF 从 Yahoo 取得 5 年日线�
 
 ### D-023 · 2026-10-06 · ACCEPTED — GitHub Pages 从 gh-pages 分支发布
 仓库已改为公开。每日任务把 `site/` 强制推送到 `gh-pages` 分支，Pages 从该分支发布。地址：https://timye9527.github.io/ETF-Market-Temperature/
+
+### D-024 · 2026-10-06 · PROPOSED — Framework V2（待 Owner 确认 V2-1…V2-8）
+Owner 明确产品用途：过热参考减仓/不买，过冷开始分批布局；只对周期性、长期存在的行业有意义。回答了 Q1（温度有方向）。
+提议见 `docs/framework-v2.md`：
+1. 温度 = 综合热度在自身 5 年历史中的百分位（区间含义统一，极热/极冷各约 5% 天数）；主时间尺度 1–6 个月，短期温度作副读数。
+2. 五维度按含义分组：价格延伸、趋势动量、拥挤度（含资金流）、成分股广度、相对强弱；极端区间需“确认清单” ≥ 3 条且持续 ≥ 3 日。
+3. 新增“周期资格”层（五项检验 + 人工复核），排除价值陷阱；参考动作只对合格节点显示。
+4. ETF 映射：Family、持仓、成分股→节点、ETF 重叠度；短历史 ETF 用持仓合成回填。
+5. 广度改为成分股级。
+6. Universe 扩至约 180 只 ETF + 约 600 只成分股（覆盖 D-012 的 100 只上限）。
+确认前 V1 继续运行，代码不改。
+
+### D-025 · 2026-10-06 · ACCEPTED — 存储有合格 ETF 了（修订 D-011）
+D-011 基于“没有纯存储 ETF”。检索发现 Roundhill Memory ETF（DRAM，2026-04-02 上市）及其杠杆产品 DRAL/RAM（+2x）、RAMZ（−2x），以及 MU、SK hynix 的单股 2x ETF。候选写入 `data/universe_v2_candidates.yaml`，核验后进入 universe，Memory 节点将不再是 NO_COVERAGE。

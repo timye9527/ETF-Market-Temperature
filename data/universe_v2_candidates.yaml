@@ -1,0 +1,58 @@
+# Universe V2 candidates (2026-10-06) — NOT loaded by the engine.
+# Found by web search this round; every entry must be checked against the issuer
+# fact sheet / prospectus before moving into data/etf_universe.yaml (MASTER_PROMPT §27).
+# See docs/framework-v2.md §3.2 and §5.
+
+memory:
+  node: EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY/SEMICONDUCTORS/MEMORY
+  cycle_class_initial: CYCLICAL
+  family_dram:
+    - {ticker: DRAM, role: CORE, issuer: Roundhill, leverage: 1, inception: "2026-04-02",
+       notes: "First memory ETF; MU, SK hynix, Samsung ~25% each; also Kioxia, Sandisk, Seagate, Western Digital; expense ratio 0.65%",
+       sources: ["https://www.roundhillinvestments.com/etf/dram/",
+                 "https://www.etf.com/sections/features/roundhill-launches-memory-etf-capture-ais-hottest-trade",
+                 "https://finance.yahoo.com/markets/stocks/articles/dram-etf-holds-73-just-184509547.html"]}
+    - {ticker: DRAL, role: LEVERAGED_BULL, issuer: Defiance, leverage: 2, inception: "2026-06-25",
+       notes: "2x daily of DRAM share price, swaps + listed options, actively managed",
+       sources: ["https://stockanalysis.com/etf/dral/"]}
+    - {ticker: RAM, role: LEVERAGED_BULL, issuer: Roundhill / T-REX, leverage: 2, inception: "2026-06-24",
+       sources: ["https://www.cnhinews.com/news/article_f0eb7e02-5bf2-5497-a9fd-30531cd2d25f.html"]}
+    - {ticker: RAMZ, role: LEVERAGED_BEAR, issuer: T-REX, leverage: 2, inception: "2026-07-28",
+       notes: "-2x daily of DRAM",
+       sources: ["https://www.rexshares.com/?p=2845"]}
+  single_stock_proxies:   # PROXY sentiment, weighted by the stock's weight in DRAM
+    MU:
+      - {ticker: MUU, issuer: Direxion, leverage: 2, sources: ["https://www.etf.com/sections/features/micron-surge-pushes-2x-leveraged-etf-muu-past-1-billion"]}
+      - {ticker: MUG, issuer: Leverage Shares, leverage: 2, sources: ["https://leverageshares.com/us/etfs/leverage-shares-2x-long-mu-daily-etf"]}
+      - {ticker: MULL, issuer: GraniteShares, leverage: 2, sources: ["https://etfdb.com/advisor_reports/MULL/"]}
+      - {ticker: MIC, issuer: Corgi, leverage: 2, sources: ["https://www.tipranks.com/etf/mic"]}
+    SK_HYNIX:
+      - {ticker: SKHU, issuer: ProShares, leverage: 2, sources: ["https://www.proshares.com/press-releases/proshares-launches-skhu-etf-targeting-2x-daily-returns-of-sk-hynix"],
+         open_question: "Underlying = US-listed SK hynix shares (a 2026 US IPO is reported) or Korean shares? Determines which price to regress against."}
+      - {ticker: SKHL, issuer: Direxion, leverage: 2, sources: ["https://www.direxion.com/xchange/memory-leader-sk-hynix-now-at-2x-with-skhl"]}
+      - {ticker: SKHX, issuer: Leverage Shares, leverage: 2, sources: ["https://leverageshares.com/us/etfs/leverage-shares-2x-long-sk-hynix-daily-etf/"]}
+    SNDK:
+      - {ticker: TBD, issuer: Tradr, leverage: 2, notes: "Tradr 2X Long SNDK Daily ETF — ticker to confirm", sources: ["https://www.itiger.com/news/1106311377"]}
+  constituents_for_breadth: [MU, 000660.KS, 005930.KS, SNDK, WDC, STX, 285A.T]
+  cross_market: [EWY]
+
+semicap_lithography:
+  node: EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY/SEMICONDUCTORS/EQUIPMENT   # new node
+  cycle_class_initial: CYCLICAL
+  etfs:
+    - {ticker: EUV, role: CORE, issuer: Corgi, leverage: 1, inception: "2026-05-06", active: true,
+       notes: "Lithography & semiconductor photonics; top holdings TSM, ASML, AMAT, LRCX, KLAC",
+       sources: ["https://stockanalysis.com/etf/euv/", "https://www.etfrc.com/EUV"]}
+
+ai_infrastructure:
+  - {ticker: DTCR, node: THEME/DATA_CENTERS, issuer: Global X, notes: "Data center & digital infrastructure; Equinix, Digital Realty, Iron Mountain",
+     cycle_class_initial: STRUCTURAL_GROWTH,
+     sources: ["https://www.nasdaq.com/articles/beyond-cloud-memory-infrastructure-etfs-buy-amid-ai-data-center-boom"]}
+  - {ticker: GRID, node: THEME/GRID_ELECTRIFICATION, issuer: First Trust, cycle_class_initial: STRUCTURAL_GROWTH,
+     sources: ["https://finance.yahoo.com/sectors/energy/articles/top-5-etfs-positioned-benefit-185032539.html"]}
+  - {ticker: NLR, node: THEME/URANIUM_NUCLEAR, issuer: VanEck, notes: "Uranium miners + nuclear utilities; second family on the node next to URA",
+     cycle_class_initial: CYCLICAL,
+     sources: ["https://247wallst.com/investing/2026/06/30/nuclear-power-is-the-only-real-answer-to-ai-data-center-demand-and-these-3-etfs-cover-the-trade-at-three-risk-levels/"]}
+
+# Second batch (well-known cyclical industry ETFs; not searched this round, verify all):
+second_batch_to_verify: [OIH, XME, COPX, SLX, LIT, ITB, XHB, IYT, JETS, IAI, KIE, IHI]

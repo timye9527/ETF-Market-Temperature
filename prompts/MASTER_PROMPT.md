@@ -669,3 +669,11 @@ US Broad Market、Nasdaq、US Sectors、Technology、Semiconductor、Memory、Fi
 - `.gitignore` 必须排除 API Key / Token / Password / .env / 本地敏感配置。
 - **覆盖第 28 条**：现阶段暂不建立 CHANGELOG、版本 Tag、复杂灾难恢复体系或大量管理文档。原则：开发优先，GitHub 持续沉淀，重要成果及时 commit/push。
 - 本项目只在 ETF-Market-Temperature repository 开发，不修改、不合并 AI-supply-chain repository。
+
+### A2 — 2026-10-06 · 产品目的与 V2 范围（原文见 `prompts/2026-10-06_purpose_and_v2_scope.md`）
+
+- **用途**：日度展示标的与板块温度。太热 → 参考减仓、至少不买入；太冷 → 开始分批布局。
+- **前提**：只对“周期性、长期持续存在”的行业有意义；价值毁灭/持续萎缩的行业，冷热没有意义（价值陷阱）。
+- **要求**：补齐 ETF（例如 DRAM 存储 ETF），提高颗粒度；用具体 ETF 与 ETF 之间的映射来表达板块，而不是粗略代理；强化“冷/热”的通用标准；重新夯实广度、标的、映射。
+- **顺序**：先把逻辑说清楚、讨论确认，再扩充实现。
+- 本条回答了 Q1：温度保持“有方向”（热 = 过热，冷 = 过冷），用途是逆向参考。

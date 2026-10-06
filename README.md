@@ -24,6 +24,10 @@
 - 数据：`PYTHONPATH=src python3 -m etf_temperature.build --source demo|yahoo`。`site/data.js` 由 GitHub Actions 用 **Yahoo 真实 EOD 行情**生成（首次运行：2026-10-06，数据截至 2026-10-05 收盘）。`--source demo` 只用于离线开发，页面会显示“演示数据”提示。
 - 真实数据：`.github/workflows/daily.yml` 每个交易日收盘后（以及每次代码推送后）用真实行情重算，提交数据并发布到 `gh-pages` 分支。
 
+## 正在进行：Framework V2（待确认）
+- `docs/framework-v2.md`：冷热通用标准（5 年自身分位）、周期资格（排除价值陷阱）、ETF 映射、成分股广度、参考动作。
+- `data/universe_v2_candidates.yaml`：存储（DRAM 系列）、光刻设备（EUV）、数据中心、电网、核电等候选 ETF。
+
 ## 正在进行（Phase 1b）
 - 逐只对照基金官网核验 benchmark / 杠杆倍数 / Family 归属（`verified` 字段）
 - 等待 Owner 决定待决问题 Q1–Q8（见 `docs/phase1-review.md` §7），尤其 Q1：温度是否有方向
