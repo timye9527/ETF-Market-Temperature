@@ -1,0 +1,11 @@
+# 周期资格 — Owner 人工复核结果（framework-v2 §2）
+#
+# 引擎每天对每个节点给出“自动建议”（页面上标注“待复核”）。Owner 复核后在这里写最终结论，
+# 人工结论优先于自动建议。类别：
+#   CYCLICAL 周期型 · STRUCTURAL_GROWTH 结构成长 · BROAD_MARKET 宽基 · DEFENSIVE 防御型
+#   SECULAR_DECLINE 结构衰退 · INSTRUMENT 工具型 · MACRO 宏观资产
+#
+# 示例：
+#   - {node: EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY/SEMICONDUCTORS/MEMORY, class: CYCLICAL,
+#      reason: "存储价格周期明确，行业长期存在", reviewed_on: "2026-10-07"}
+reviewed: []

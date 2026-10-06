@@ -91,8 +91,9 @@ class PipelineTest(unittest.TestCase):
             t = rec["temperature"].dropna()
             self.assertTrue(((t >= 0) & (t <= 100)).all(), nid)
 
-    def test_no_coverage_node_has_no_temperature(self):
-        self.assertNotIn("EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY/SEMICONDUCTORS/MEMORY", self.e.node)
+    def test_memory_node_now_covered(self):
+        # D-025: the Roundhill Memory ETF (DRAM) gives the node a core fund.
+        self.assertIn("EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY/SEMICONDUCTORS/MEMORY", self.e.node)
 
     def test_leveraged_price_never_drives_trend(self):
         # Semiconductors' price must come from a core fund, never SOXL/SOXS.

@@ -20,7 +20,11 @@ ROLES = {
 PRICE_ROLES = {"CORE", "ALTERNATIVE_CORE", "THEMATIC"}
 SENTIMENT_ROLES = {"LEVERAGED_BULL", "LEVERAGED_BEAR", "INVERSE"}
 TIERS = {1, 2, 3, "IGNORE"}
-IDENTITY_BASES = {"INDEX", "SPOT_ASSET", "FUTURES_STRATEGY", "ACTIVE"}
+IDENTITY_BASES = {"INDEX", "SPOT_ASSET", "FUTURES_STRATEGY", "ACTIVE", "SINGLE_STOCK"}
+BUCKETS = [
+    "US_BROAD", "US_SECTOR", "US_INDUSTRY", "THEME", "LEVERAGED_INDEX", "LEVERAGED_SINGLE_STOCK",
+    "BOND", "COMMODITY", "INTERNATIONAL", "CRYPTO", "REFERENCE",
+]
 LEVELS = {
     "ROOT", "ASSET_CLASS", "REGION", "DIMENSION", "SEGMENT",
     "SECTOR", "INDUSTRY", "SUB_INDUSTRY", "THEME",
@@ -32,7 +36,31 @@ class Universe:
     nodes: dict[str, dict]
     families: dict[str, dict]
     etfs: dict[str, dict]
+    stocks: dict[str, dict] = field(default_factory=dict)
     errors: list[str] = field(default_factory=list)
+
+    def bucket(self, ticker: str) -> str:
+        """Liquidity-ranking category (framework-v2 §5), derived from node + role."""
+        e = self.etfs[ticker]
+        fam = self.families[e["family"]]
+        if fam.get("identity_basis") == "SINGLE_STOCK":
+            return "LEVERAGED_SINGLE_STOCK"
+        if e["role"] in SENTIMENT_ROLES:
+            return "LEVERAGED_INDEX"
+        parts = fam["node"].split("/")
+        top = parts[0]
+        if top == "THEME":
+            return "THEME"
+        if top == "EQUITY":
+            if parts[1] == "US" and len(parts) > 2:
+                if parts[2] in ("BROAD", "STYLE"):
+                    return "US_BROAD"
+                return "US_SECTOR" if len(parts) == 4 else "US_INDUSTRY"
+            if "SECTOR" in parts:
+                return "US_INDUSTRY"
+            return "INTERNATIONAL"
+        return {"BOND": "BOND", "CASH_LIKE": "BOND", "COMMODITY": "COMMODITY",
+                "PRECIOUS_METALS": "COMMODITY", "CRYPTO": "CRYPTO"}.get(top, "REFERENCE")
 
     def members(self, family_id: str) -> list[dict]:
         return [e for e in self.etfs.values() if e["family"] == family_id]
@@ -72,6 +100,7 @@ def load(data_dir: Path = DATA_DIR) -> Universe:
         nodes={n["id"]: n for n in tax["nodes"]},
         families={f["id"]: f for f in uni["families"]},
         etfs={e["ticker"]: e for e in uni["etfs"]},
+        stocks={s["ticker"]: s for s in uni.get("stocks", [])},
     )
     u.errors = validate(u, tax, uni)
     return u
@@ -118,10 +147,18 @@ def validate(u: Universe, tax: dict, uni: dict) -> list[str]:
             errs.append(f"family {fid}: bad identity_basis")
         roles = [e["role"] for e in u.members(fid)]
         n_core = sum(r in ("CORE", "THEMATIC") for r in roles)
+        for t in (f.get("backfill") or {}):
+            if t not in u.stocks:
+                errs.append(f"family {fid}: backfill stock {t} not in stocks")
         if f.get("sentiment_only"):
-            proxy = u.families.get(f.get("price_proxy_family"))
-            if n_core or not proxy or proxy["node"] != f["node"]:
-                errs.append(f"family {fid}: sentiment_only needs 0 core and a same-node price_proxy_family")
+            if f.get("identity_basis") == "SINGLE_STOCK":
+                stk = u.stocks.get(f.get("underlying_stock"))
+                if n_core or not stk or stk["node"] != f["node"]:
+                    errs.append(f"family {fid}: single-stock family needs a mapped underlying_stock on the same node")
+            else:
+                proxy = u.families.get(f.get("price_proxy_family"))
+                if n_core or not proxy or proxy["node"] != f["node"]:
+                    errs.append(f"family {fid}: sentiment_only needs 0 core and a same-node price_proxy_family")
             if not set(roles) <= SENTIMENT_ROLES:
                 errs.append(f"family {fid}: sentiment_only family has non-sentiment members")
         elif n_core != 1:
@@ -134,7 +171,7 @@ def validate(u: Universe, tax: dict, uni: dict) -> list[str]:
         role, d, lev = e.get("role"), e.get("direction"), e.get("leverage")
         if role not in ROLES:
             errs.append(f"{t}: bad role {role}")
-        if e.get("tier") not in TIERS:
+        if "tier" in e and e["tier"] not in TIERS:
             errs.append(f"{t}: bad tier {e.get('tier')}")
         if d not in ("LONG", "SHORT"):
             errs.append(f"{t}: bad direction {d}")
@@ -145,12 +182,17 @@ def validate(u: Universe, tax: dict, uni: dict) -> list[str]:
             errs.append(f"{t}: LEVERAGED_BULL must be LONG with leverage > 1")
         if role == "LEVERAGED_BEAR" and not (d == "SHORT" and lev > 1):
             errs.append(f"{t}: LEVERAGED_BEAR must be SHORT with leverage > 1")
-        if role == "INVERSE" and not (d == "SHORT" and lev == 1):
-            errs.append(f"{t}: INVERSE must be SHORT with leverage 1")
+        if role == "INVERSE" and not (d == "SHORT" and lev <= 1):
+            errs.append(f"{t}: INVERSE must be SHORT with leverage <= 1")
         if role in PRICE_ROLES and not (d == "LONG" and lev == 1):
             errs.append(f"{t}: {role} must be unlevered LONG")
         if not isinstance(e.get("verified"), bool):
             errs.append(f"{t}: verified flag required")
+    for t, st in u.stocks.items():
+        if st.get("node") not in u.nodes:
+            errs.append(f"stock {t}: node {st.get('node')} missing")
+    if set(u.stocks) & set(u.etfs):
+        errs.append(f"tickers listed as both ETF and stock: {set(u.stocks) & set(u.etfs)}")
     return errs
 
 
@@ -158,9 +200,11 @@ if __name__ == "__main__":
     u = load()
     for err in u.errors:
         print("ERROR", err)
-    tiers: dict = {}
-    for e in u.etfs.values():
-        tiers[e["tier"]] = tiers.get(e["tier"], 0) + 1
-    print(f"nodes={len(u.nodes)} families={len(u.families)} etfs={len(u.etfs)} tiers={tiers}")
+    buckets: dict = {}
+    for t in u.etfs:
+        b = u.bucket(t)
+        buckets[b] = buckets.get(b, 0) + 1
+    print(f"nodes={len(u.nodes)} families={len(u.families)} etfs={len(u.etfs)} stocks={len(u.stocks)}")
+    print("buckets:", buckets)
     print(f"verified={sum(e['verified'] for e in u.etfs.values())}/{len(u.etfs)}")
     raise SystemExit(1 if u.errors else 0)

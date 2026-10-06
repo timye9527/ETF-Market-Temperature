@@ -68,7 +68,7 @@ def fetch_yahoo(tickers, years: int = 5, pause: float = 0.4) -> dict[str, pd.Dat
             failed.append(f"{t}: {err}")
         time.sleep(pause)
     _drop_unfinished_session(out)
-    if len(failed) > 0.2 * len(tickers):
+    if len(failed) > 0.35 * len(tickers):
         raise RuntimeError("too many tickers failed:\n" + "\n".join(failed))
     for f in failed:
         print("WARN", f)
@@ -139,25 +139,33 @@ def make_demo(universe, end: str = "2026-10-05", years: int = 5, seed: int = 7) 
             shocks[path] = rng.normal(0, 0.006, n) + wave
         return shocks[path]
 
-    core_returns: dict[str, np.ndarray] = {}
-    for fid, fam in universe.families.items():
-        top = fam["node"].split("/")[0]
+    def asset_returns(node: str, scale: float = 1.0) -> np.ndarray:
+        top = node.split("/")[0]
         mu, vol = _PROFILE.get(top, (0.05, 0.2))
         beta = {"EQUITY": 1.0, "THEME": 1.3, "CRYPTO": 1.2, "BOND": -0.15,
                 "PRECIOUS_METALS": -0.1, "VOLATILITY": -4.0, "CURRENCY": -0.2}.get(top, 0.3)
         r = beta * (market + regime) + mu / 252
-        for p in _node_chain(fam["node"]):
-            r = r + node_shock(p) * (vol / 0.17) * 0.5
-        r = r + rng.normal(0, vol / np.sqrt(252) * 0.35, n)
+        for p_ in _node_chain(node):
+            r = r + node_shock(p_) * (vol / 0.17) * 0.5
+        r = r + rng.normal(0, vol / np.sqrt(252) * 0.35 * scale, n)
         if top == "CASH_LIKE":
             r = np.full(n, mu / 252) + rng.normal(0, 0.00005, n)
-        core_returns[fid] = np.clip(r, -0.25, 0.25)
+        return np.clip(r, -0.25, 0.25)
+
+    core_returns: dict[str, np.ndarray] = {}
+    for fid, fam in universe.families.items():
+        if not fam.get("sentiment_only"):
+            core_returns[fid] = asset_returns(fam["node"])
+    stock_returns = {t: asset_returns(st["node"], scale=2.0) for t, st in getattr(universe, "stocks", {}).items()}
 
     out: dict[str, pd.DataFrame] = {}
     for t, e in universe.etfs.items():
         fam = universe.families[e["family"]]
-        base_fid = fam.get("price_proxy_family", fam["id"]) if fam.get("sentiment_only") else fam["id"]
-        r_core = core_returns[base_fid]
+        if fam.get("identity_basis") == "SINGLE_STOCK":
+            r_core = stock_returns[fam["underlying_stock"]]
+        else:
+            base_fid = fam.get("price_proxy_family", fam["id"]) if fam.get("sentiment_only") else fam["id"]
+            r_core = core_returns[base_fid]
         sign = 1 if e["direction"] == "LONG" else -1
         r = sign * e["leverage"] * r_core
         if e["role"] == "ALTERNATIVE_CORE":
@@ -169,7 +177,7 @@ def make_demo(universe, end: str = "2026-10-05", years: int = 5, seed: int = 7) 
         absr = np.abs(r_core) / (np.std(r_core) + 1e-9)
         trend20 = pd.Series(r_core).rolling(20, min_periods=1).sum().to_numpy()
         z = trend20 / (np.std(trend20) + 1e-9)
-        tier = e["tier"] if e["tier"] in _BASE_DV else 3
+        tier = e.get("tier") if e.get("tier") in _BASE_DV else 2
         base = _BASE_DV[tier] * (1.6 if e["role"] in ("LEVERAGED_BULL", "LEVERAGED_BEAR") else 1.0)
         growth = np.linspace(0.75, 1.25, n)
         mood = 1.0
@@ -189,4 +197,10 @@ def make_demo(universe, end: str = "2026-10-05", years: int = 5, seed: int = 7) 
              "adj_close": close, "volume": vol_shares},
             index=pd.DatetimeIndex(dates, name="date"),
         )
+    for t, r in stock_returns.items():
+        close = 100 * np.cumprod(1 + r)
+        dv = 3e9 * np.exp(rng.normal(0, 0.3, n))
+        out[t] = pd.DataFrame({"open": close, "high": close * 1.005, "low": close * 0.995, "close": close,
+                               "adj_close": close, "volume": (dv / close).round()},
+                              index=pd.DatetimeIndex(dates, name="date"))
     return out

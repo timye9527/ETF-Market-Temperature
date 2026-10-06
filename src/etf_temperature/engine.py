@@ -153,7 +153,7 @@ class Engine:
                 m.update(trend_scores(p))
                 m.update(volume_scores(dv, p))
                 m["weight"] = math.sqrt(float(dv.tail(60).mean() or 0))
-                m["tier3_only"] = all(e["tier"] == 3 for e in members if e["ticker"] == core)
+                m["tier3_only"] = all(e.get("tier") == 3 for e in members if e["ticker"] == core)
             bull = bear = None
             for e in members:
                 if e["role"] not in ("LEVERAGED_BULL", "LEVERAGED_BEAR", "INVERSE"):
