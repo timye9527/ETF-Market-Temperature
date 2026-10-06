@@ -67,11 +67,26 @@ def fetch_yahoo(tickers, years: int = 5, pause: float = 0.4) -> dict[str, pd.Dat
         if err is not None:
             failed.append(f"{t}: {err}")
         time.sleep(pause)
+    _drop_unfinished_session(out)
     if len(failed) > 0.2 * len(tickers):
         raise RuntimeError("too many tickers failed:\n" + "\n".join(failed))
     for f in failed:
         print("WARN", f)
     return out
+
+
+def _drop_unfinished_session(bars: dict[str, pd.DataFrame], now=None) -> None:
+    """Remove today's bar while the US session is still open: its partial volume
+    would read as a collapse in dollar volume."""
+    from zoneinfo import ZoneInfo
+
+    now = now or datetime.now(ZoneInfo("America/New_York"))
+    if now.hour * 60 + now.minute >= 16 * 60 + 15:
+        return
+    today = pd.Timestamp(now.date())
+    for t, df in bars.items():
+        if len(df) and df.index[-1] == today:
+            bars[t] = df.iloc[:-1]
 
 
 def fetch_stooq(tickers, pause: float = 0.4) -> dict[str, pd.DataFrame]:

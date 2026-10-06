@@ -107,6 +107,20 @@ class PipelineTest(unittest.TestCase):
         self.assertIn("bullbear", self.e.node["PRECIOUS_METALS/SILVER"]["series"])
 
 
+class SessionGuardTest(unittest.TestCase):
+    def test_partial_bar_dropped_during_session(self):
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        from etf_temperature.sources import _drop_unfinished_session
+        idx = pd.to_datetime(["2026-10-05", "2026-10-06"])
+        bars = {"SPY": pd.DataFrame({"close": [1.0, 2.0]}, index=idx)}
+        _drop_unfinished_session(bars, datetime(2026, 10, 6, 11, 0, tzinfo=ZoneInfo("America/New_York")))
+        self.assertEqual(len(bars["SPY"]), 1)
+        bars = {"SPY": pd.DataFrame({"close": [1.0, 2.0]}, index=idx)}
+        _drop_unfinished_session(bars, datetime(2026, 10, 6, 17, 0, tzinfo=ZoneInfo("America/New_York")))
+        self.assertEqual(len(bars["SPY"]), 2)
+
+
 class YahooParseTest(unittest.TestCase):
     def test_parse(self):
         payload = {"chart": {"result": [{"timestamp": [1759708800, 1759795200],
