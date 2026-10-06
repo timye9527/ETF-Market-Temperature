@@ -19,7 +19,7 @@
 ## 网站（V1）
 - `site/index.html` + `site/data.js`：总览温度板、风险偏好（解读层）、资金轮动（5/20 日温度变化）、市场树、节点详情（因子拆解、温度历史、ETF Family 表、杠杆自动校验）、方法说明。
 - 本地查看：直接用浏览器打开 `site/index.html`。
-- 数据：`PYTHONPATH=src python3 -m etf_temperature.build --source demo|yahoo`。当前仓库内是**演示数据**（开发环境无法访问行情源，见 D-017），页面顶部有明显提示。
+- 数据：`PYTHONPATH=src python3 -m etf_temperature.build --source demo|yahoo`。`site/data.js` 由 GitHub Actions 用 **Yahoo 真实 EOD 行情**生成（首次运行：2026-10-06，数据截至 2026-10-05 收盘）。`--source demo` 只用于离线开发，页面会显示“演示数据”提示。
 - 真实数据：`.github/workflows/daily.yml` 每个交易日收盘后用真实行情重算并部署到 GitHub Pages（需要在仓库 Settings → Pages 把 Source 设为 GitHub Actions；私有仓库使用 Pages 需要付费计划）。
 
 ## 正在进行（Phase 1b）
