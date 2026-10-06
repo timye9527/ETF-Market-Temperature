@@ -1,0 +1,239 @@
+# ETF Market Temperature — V1 ETF Universe (v0.1, 2026-10-06)
+#
+# 结构：families（经济暴露的身份） + etfs（具体工具）。
+# 单一事实来源：ETF 的 asset_class / region / sector / industry 不在 ETF 上重复填写，
+# 而是由 etf.family → family.node → taxonomy.yaml 的路径推导（见 docs/family-model.md §2）。
+#
+# ⚠️ 数据完整性声明（必须读）：
+#   本文件所有 benchmark / leverage / issuer 信息来自研究员知识整理，尚未逐只对照基金官网 fact sheet 核验。
+#   因此每只 ETF 的 verified 都是 false。Phase 1b 的第一项工作就是逐只核验并把 verified 改为 true、
+#   填写 source_url 与 verified_on。verified: false 的 Leveraged / Inverse ETF 不得进入 Bull/Bear 因子计算。
+#   AUM / 成交额 / expense_ratio / inception_date 是会变化的数字，不手填，由数据管道写入 data/metadata/（见 docs/data-requirements.md）。
+#
+# 字段：
+#   family.identity_basis: INDEX（同一指数） | SPOT_ASSET（实物/现货同一资产，如 GLD/IAU）
+#                          | FUTURES_STRATEGY（期货滚动策略，每只基金规则不同 → 各自成 Family） | ACTIVE（主动管理）
+#   etf.role:      CORE | ALTERNATIVE_CORE | LEVERAGED_BULL | LEVERAGED_BEAR | INVERSE | SATELLITE | THEMATIC | PROXY
+#   etf.direction: LONG | SHORT
+#   etf.leverage:  每日杠杆目标的绝对值（1, 1.5, 2, 3）；方向由 direction 表示
+#   etf.tier:      1 | 2 | 3 | IGNORE   —— 初始值为研究员判断（tier_source: judgment），上线后按 docs/family-model.md §6 规则用数据重算
+#   family.sentiment_only: 该 Family 只有杠杆/反向成员（期货指数与现货 Family 不同），价格因子取 price_proxy_family（同节点）
+#   etf.exchange:  留空，由数据源填写，避免手填出错
+
+schema_version: 1
+as_of: "2026-10-06"
+tier_source: judgment
+
+families:
+  # ── US broad market ──
+  - {id: SP500_US, name: S&P 500, node: EQUITY/US/BROAD/SP500, benchmark: S&P 500 Index, identity_basis: INDEX}
+  - {id: NASDAQ100_US, name: Nasdaq-100, node: EQUITY/US/BROAD/NASDAQ100, benchmark: Nasdaq-100 Index, identity_basis: INDEX}
+  - {id: RUSSELL2000_US, name: Russell 2000, node: EQUITY/US/BROAD/SMALL_CAP, benchmark: Russell 2000 Index, identity_basis: INDEX}
+  - {id: DJIA_US, name: Dow Jones Industrial Average, node: EQUITY/US/BROAD/DOW, benchmark: Dow Jones Industrial Average, identity_basis: INDEX}
+  - {id: CRSP_TOTAL_US, name: US Total Market (CRSP), node: EQUITY/US/BROAD/TOTAL_MARKET, benchmark: CRSP US Total Market Index, identity_basis: INDEX}
+
+  # ── US style ──
+  - {id: R1000_GROWTH_US, name: Russell 1000 Growth, node: EQUITY/US/STYLE/GROWTH, benchmark: Russell 1000 Growth Index, identity_basis: INDEX}
+  - {id: R1000_VALUE_US, name: Russell 1000 Value, node: EQUITY/US/STYLE/VALUE, benchmark: Russell 1000 Value Index, identity_basis: INDEX}
+  - {id: DJ_DIV100_US, name: Dow Jones US Dividend 100, node: EQUITY/US/STYLE/DIVIDEND, benchmark: Dow Jones U.S. Dividend 100 Index, identity_basis: INDEX}
+  - {id: MSCI_USA_MINVOL, name: MSCI USA Minimum Volatility, node: EQUITY/US/STYLE/LOW_VOLATILITY, benchmark: MSCI USA Minimum Volatility Index, identity_basis: INDEX}
+  - {id: SP500_HIGH_BETA, name: S&P 500 High Beta, node: EQUITY/US/STYLE/HIGH_BETA, benchmark: S&P 500 High Beta Index, identity_basis: INDEX}
+  - {id: MSCI_USA_QUALITY, name: MSCI USA Quality, node: EQUITY/US/STYLE/QUALITY, benchmark: MSCI USA Sector Neutral Quality Index, identity_basis: INDEX}
+
+  # ── US sectors (Select Sector indices = GICS sectors of S&P 500) ──
+  - {id: SECTOR_TECH_US, name: Technology Select Sector, node: EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY, benchmark: Technology Select Sector Index, identity_basis: INDEX}
+  - {id: SECTOR_COMM_US, name: Communication Services Select Sector, node: EQUITY/US/SECTOR/COMMUNICATION_SERVICES, benchmark: Communication Services Select Sector Index, identity_basis: INDEX}
+  - {id: SECTOR_DISC_US, name: Consumer Discretionary Select Sector, node: EQUITY/US/SECTOR/CONSUMER_DISCRETIONARY, benchmark: Consumer Discretionary Select Sector Index, identity_basis: INDEX}
+  - {id: SECTOR_STAPLES_US, name: Consumer Staples Select Sector, node: EQUITY/US/SECTOR/CONSUMER_STAPLES, benchmark: Consumer Staples Select Sector Index, identity_basis: INDEX}
+  - {id: SECTOR_FIN_US, name: Financial Select Sector, node: EQUITY/US/SECTOR/FINANCIALS, benchmark: Financial Select Sector Index, identity_basis: INDEX}
+  - {id: SECTOR_HEALTH_US, name: Health Care Select Sector, node: EQUITY/US/SECTOR/HEALTH_CARE, benchmark: Health Care Select Sector Index, identity_basis: INDEX}
+  - {id: SECTOR_INDU_US, name: Industrial Select Sector, node: EQUITY/US/SECTOR/INDUSTRIALS, benchmark: Industrial Select Sector Index, identity_basis: INDEX}
+  - {id: SECTOR_ENERGY_US, name: Energy Select Sector, node: EQUITY/US/SECTOR/ENERGY, benchmark: Energy Select Sector Index, identity_basis: INDEX}
+  - {id: SECTOR_MATERIALS_US, name: Materials Select Sector, node: EQUITY/US/SECTOR/MATERIALS, benchmark: Materials Select Sector Index, identity_basis: INDEX}
+  - {id: SECTOR_UTIL_US, name: Utilities Select Sector, node: EQUITY/US/SECTOR/UTILITIES, benchmark: Utilities Select Sector Index, identity_basis: INDEX}
+  - {id: SECTOR_REIT_US, name: Real Estate Select Sector, node: EQUITY/US/SECTOR/REAL_ESTATE, benchmark: Real Estate Select Sector Index, identity_basis: INDEX}
+
+  # ── US industries ──
+  # 半导体：SOXX/SOXL/SOXS 跟踪同一指数；SMH 跟踪不同指数 → 两个 Family，同挂 Semiconductors 节点（D-004）
+  - {id: SEMI_ICE_US, name: Semiconductors (ICE/NYSE Semiconductor Index), node: EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY/SEMICONDUCTORS, benchmark: NYSE Semiconductor Index (ICE), identity_basis: INDEX, note: "SOXX 于 2021 年由 PHLX SOX 切换到该指数；SOXL/SOXS 同期切换。需核验当前指数正式名称"}
+  - {id: SEMI_MVIS_US, name: Semiconductors (MVIS US Listed Semiconductor 25), node: EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY/SEMICONDUCTORS, benchmark: MVIS US Listed Semiconductor 25 Index, identity_basis: INDEX}
+  - {id: SOFTWARE_US, name: Expanded Tech-Software, node: EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY/SOFTWARE, benchmark: S&P North American Expanded Technology Software Index, identity_basis: INDEX}
+  - {id: BANKS_US, name: S&P Banks Select Industry, node: EQUITY/US/SECTOR/FINANCIALS/BANKS, benchmark: S&P Banks Select Industry Index, identity_basis: INDEX}
+  - {id: REGIONAL_BANKS_US, name: S&P Regional Banks Select Industry, node: EQUITY/US/SECTOR/FINANCIALS/BANKS/REGIONAL_BANKS, benchmark: S&P Regional Banks Select Industry Index, identity_basis: INDEX}
+  - {id: OILGAS_EP_US, name: S&P Oil & Gas E&P Select Industry, node: EQUITY/US/SECTOR/ENERGY/OIL_GAS_EP, benchmark: S&P Oil & Gas Exploration & Production Select Industry Index, identity_basis: INDEX}
+  - {id: BIOTECH_SPSI_US, name: S&P Biotechnology Select Industry, node: EQUITY/US/SECTOR/HEALTH_CARE/BIOTECHNOLOGY, benchmark: S&P Biotechnology Select Industry Index, identity_basis: INDEX}
+  - {id: AERO_DEF_US, name: Dow Jones US Select Aerospace & Defense, node: EQUITY/US/SECTOR/INDUSTRIALS/AEROSPACE_DEFENSE, benchmark: Dow Jones U.S. Select Aerospace & Defense Index, identity_basis: INDEX}
+  - {id: RETAIL_US, name: S&P Retail Select Industry, node: EQUITY/US/SECTOR/CONSUMER_DISCRETIONARY/RETAIL, benchmark: S&P Retail Select Industry Index, identity_basis: INDEX}
+
+  # ── Global industries ──
+  - {id: GOLD_MINERS, name: Gold Miners (NYSE Arca Gold Miners), node: EQUITY/GLOBAL/SECTOR/MATERIALS/GOLD_MINERS, benchmark: NYSE Arca Gold Miners Index, identity_basis: INDEX, note: "NUGT/DUST 跟踪的是金矿股指数，不是金价 —— 它们属于本 Family，不属于 GOLD_SPOT"}
+  - {id: JUNIOR_GOLD_MINERS, name: Junior Gold Miners, node: EQUITY/GLOBAL/SECTOR/MATERIALS/JUNIOR_GOLD_MINERS, benchmark: MVIS Global Junior Gold Miners Index, identity_basis: INDEX}
+
+  # ── Regions ──
+  - {id: ACWI_GLOBAL, name: MSCI ACWI, node: EQUITY/GLOBAL, benchmark: MSCI ACWI Index, identity_basis: INDEX}
+  - {id: MSCI_HK, name: MSCI Hong Kong, node: EQUITY/HONG_KONG, benchmark: MSCI Hong Kong 25/50 Index, identity_basis: INDEX, note: "美股上市代理，交易时段与港股不同步（D-009）"}
+  - {id: FTSE_CHINA50, name: FTSE China 50, node: EQUITY/CHINA/LARGE_CAP, benchmark: FTSE China 50 Index, identity_basis: INDEX}
+  - {id: CHINA_MSCI, name: MSCI China, node: EQUITY/CHINA, benchmark: MSCI China Index, identity_basis: INDEX}
+  - {id: MSCI_JAPAN, name: MSCI Japan, node: EQUITY/JAPAN, benchmark: MSCI Japan Index, identity_basis: INDEX}
+  - {id: FTSE_EUROPE, name: FTSE Developed Europe, node: EQUITY/EUROPE, benchmark: FTSE Developed Europe All Cap Index, identity_basis: INDEX}
+  - {id: MSCI_INDIA, name: MSCI India, node: EQUITY/INDIA, benchmark: MSCI India Index, identity_basis: INDEX}
+  - {id: MSCI_TAIWAN, name: MSCI Taiwan, node: EQUITY/TAIWAN, benchmark: MSCI Taiwan 25/50 Index, identity_basis: INDEX}
+  - {id: MSCI_KOREA, name: MSCI Korea, node: EQUITY/KOREA, benchmark: MSCI Korea 25/50 Index, identity_basis: INDEX, note: "Samsung + SK hynix 权重很高，可作为 Memory 的间接观察（只做 tag，不做 Memory 温度）"}
+  - {id: MSCI_EM, name: MSCI Emerging Markets, node: EQUITY/EMERGING_MARKETS, benchmark: MSCI Emerging Markets Index, identity_basis: INDEX}
+
+  # ── Themes ──
+  - {id: AI_BIGDATA, name: AI & Big Data, node: THEME/AI_INFRASTRUCTURE, benchmark: Indxx Artificial Intelligence & Big Data Index, identity_basis: INDEX, note: "暂代 AI 主题；“AI Infrastructure” 更精确的 ETF 需 Phase 1b 研究"}
+  - {id: CYBERSECURITY, name: Cybersecurity, node: THEME/CYBERSECURITY, benchmark: Nasdaq CTA Cybersecurity Index, identity_basis: INDEX}
+  - {id: ARK_INNOVATION, name: ARK Innovation, node: THEME/DISRUPTIVE_INNOVATION, benchmark: null, identity_basis: ACTIVE, note: "主动管理，无指数；作为投机成长风险偏好代理"}
+  - {id: CHINA_INTERNET, name: China Internet (CSI Overseas), node: THEME/CHINA_INTERNET, benchmark: CSI Overseas China Internet Index, identity_basis: INDEX, note: "CWEB 跟踪的 CSI China Internet Index 与 KWEB 不同 → 不并入（D-004）"}
+  - {id: URANIUM_NUCLEAR, name: Uranium & Nuclear, node: THEME/URANIUM_NUCLEAR, benchmark: Solactive Global Uranium & Nuclear Components Total Return Index, identity_basis: INDEX}
+
+  # ── Bonds ──
+  - {id: UST_20Y_PLUS, name: US Treasury 20+ Year, node: BOND/US/TREASURY/LONG, benchmark: ICE U.S. Treasury 20+ Year Index, identity_basis: INDEX, note: "TMF/TMV 的指数需核验是否与 TLT 完全一致；不一致则拆 Family"}
+  - {id: UST_7_10Y, name: US Treasury 7-10 Year, node: BOND/US/TREASURY/INTERMEDIATE, benchmark: ICE U.S. Treasury 7-10 Year Index, identity_basis: INDEX}
+  - {id: UST_1_3Y, name: US Treasury 1-3 Year, node: BOND/US/TREASURY/SHORT, benchmark: ICE U.S. Treasury 1-3 Year Index, identity_basis: INDEX}
+  - {id: US_IG_CORP, name: US Investment Grade Corporate, node: BOND/US/CREDIT/INVESTMENT_GRADE, benchmark: Markit iBoxx USD Liquid Investment Grade Index, identity_basis: INDEX}
+  - {id: US_HY_CORP, name: US High Yield Corporate, node: BOND/US/CREDIT/HIGH_YIELD, benchmark: Markit iBoxx USD Liquid High Yield Index, identity_basis: INDEX}
+  - {id: US_TBILLS, name: US T-Bills 0-3 Month, node: CASH_LIKE/US/TBILLS, benchmark: ICE 0-3 Month US Treasury Securities Index, identity_basis: INDEX}
+
+  # ── Precious metals ──
+  - {id: GOLD_SPOT, name: Gold (physical), node: PRECIOUS_METALS/GOLD, benchmark: LBMA Gold Price PM, identity_basis: SPOT_ASSET}
+  - {id: SILVER_SPOT, name: Silver (physical), node: PRECIOUS_METALS/SILVER, benchmark: LBMA Silver Price, identity_basis: SPOT_ASSET}
+  - {id: SILVER_BBG_2X, name: Silver futures 2x (Bloomberg Silver Subindex), node: PRECIOUS_METALS/SILVER, benchmark: Bloomberg Silver Subindex, identity_basis: INDEX, sentiment_only: true, price_proxy_family: SILVER_SPOT, note: "AGQ/ZSL 跟踪期货指数而非现货 → 不能并入 SILVER_SPOT（D-004）。只提供 Bull/Bear 情绪，价格因子取 SILVER_SPOT"}
+
+  # ── Commodities ──
+  - {id: COMMODITY_BROAD, name: Broad Commodities (DBIQ Optimum Yield), node: COMMODITY/BROAD, benchmark: DBIQ Optimum Yield Diversified Commodity Index Excess Return, identity_basis: INDEX}
+  - {id: WTI_USO, name: WTI Crude (USO strategy), node: COMMODITY/ENERGY/CRUDE_OIL, benchmark: USO futures roll strategy (no third-party index), identity_basis: FUTURES_STRATEGY}
+  - {id: WTI_BBG_2X, name: WTI Crude 2x (Bloomberg WTI Crude Oil Subindex), node: COMMODITY/ENERGY/CRUDE_OIL, benchmark: Bloomberg WTI Crude Oil Subindex, identity_basis: INDEX, sentiment_only: true, price_proxy_family: WTI_USO, note: "V1 只收录 UCO（无对应 Bear 进入 universe）→ 只计算 Bull activity，不计算 Bull Share"}
+  - {id: NATGAS_UNG, name: Natural Gas (UNG strategy), node: COMMODITY/ENERGY/NATURAL_GAS, benchmark: UNG futures roll strategy (no third-party index), identity_basis: FUTURES_STRATEGY}
+  - {id: COPPER_CPER, name: Copper (SummerHaven Copper Index), node: COMMODITY/INDUSTRIAL_METALS/COPPER, benchmark: SummerHaven Copper Index Total Return, identity_basis: INDEX}
+
+  # ── Currency / Crypto / Volatility ──
+  - {id: USD_LONG, name: US Dollar Bullish, node: CURRENCY/USD, benchmark: Deutsche Bank Long USD Currency Portfolio Index Excess Return, identity_basis: INDEX}
+  - {id: BITCOIN_SPOT, name: Bitcoin (spot), node: CRYPTO/BITCOIN, benchmark: Bitcoin spot (fund-specific reference rate), identity_basis: SPOT_ASSET, note: "IBIT/FBTC 参考价提供方不同但都是现货比特币 → SPOT_ASSET 规则下同 Family（D-004）"}
+  - {id: ETHER_SPOT, name: Ether (spot), node: CRYPTO/ETHEREUM, benchmark: Ether spot (fund-specific reference rate), identity_basis: SPOT_ASSET}
+  - {id: VIX_ST_FUTURES, name: VIX Short-Term Futures, node: VOLATILITY/VIX_SHORT_TERM_FUTURES, benchmark: S&P 500 VIX Short-Term Futures Index, identity_basis: INDEX}
+
+etfs:
+  # ── S&P 500 ──
+  - {ticker: SPY,  name: SPDR S&P 500 ETF Trust,            issuer: State Street, family: SP500_US, role: CORE,             direction: LONG,  leverage: 1, tier: 1, verified: false}
+  - {ticker: IVV,  name: iShares Core S&P 500 ETF,          issuer: iShares,      family: SP500_US, role: ALTERNATIVE_CORE, direction: LONG,  leverage: 1, tier: 1, verified: false}
+  - {ticker: VOO,  name: Vanguard S&P 500 ETF,              issuer: Vanguard,     family: SP500_US, role: ALTERNATIVE_CORE, direction: LONG,  leverage: 1, tier: 1, verified: false}
+  - {ticker: UPRO, name: ProShares UltraPro S&P500,         issuer: ProShares,    family: SP500_US, role: LEVERAGED_BULL,   direction: LONG,  leverage: 3, tier: 1, verified: false}
+  - {ticker: SPXU, name: ProShares UltraPro Short S&P500,   issuer: ProShares,    family: SP500_US, role: LEVERAGED_BEAR,   direction: SHORT, leverage: 3, tier: 1, verified: false}
+  - {ticker: SH,   name: ProShares Short S&P500,            issuer: ProShares,    family: SP500_US, role: INVERSE,          direction: SHORT, leverage: 1, tier: 2, verified: false}
+
+  # ── Nasdaq-100 ──
+  - {ticker: QQQ,  name: Invesco QQQ Trust,                 issuer: Invesco,      family: NASDAQ100_US, role: CORE,             direction: LONG,  leverage: 1, tier: 1, verified: false}
+  - {ticker: QQQM, name: Invesco NASDAQ 100 ETF,            issuer: Invesco,      family: NASDAQ100_US, role: ALTERNATIVE_CORE, direction: LONG,  leverage: 1, tier: 2, verified: false}
+  - {ticker: TQQQ, name: ProShares UltraPro QQQ,            issuer: ProShares,    family: NASDAQ100_US, role: LEVERAGED_BULL,   direction: LONG,  leverage: 3, tier: 1, verified: false}
+  - {ticker: SQQQ, name: ProShares UltraPro Short QQQ,      issuer: ProShares,    family: NASDAQ100_US, role: LEVERAGED_BEAR,   direction: SHORT, leverage: 3, tier: 1, verified: false}
+  - {ticker: PSQ,  name: ProShares Short QQQ,               issuer: ProShares,    family: NASDAQ100_US, role: INVERSE,          direction: SHORT, leverage: 1, tier: 3, verified: false}
+
+  # ── Russell 2000 / Dow / Total ──
+  - {ticker: IWM,  name: iShares Russell 2000 ETF,              issuer: iShares,  family: RUSSELL2000_US, role: CORE,           direction: LONG,  leverage: 1, tier: 1, verified: false}
+  - {ticker: TNA,  name: Direxion Daily Small Cap Bull 3X,      issuer: Direxion, family: RUSSELL2000_US, role: LEVERAGED_BULL, direction: LONG,  leverage: 3, tier: 2, verified: false}
+  - {ticker: TZA,  name: Direxion Daily Small Cap Bear 3X,      issuer: Direxion, family: RUSSELL2000_US, role: LEVERAGED_BEAR, direction: SHORT, leverage: 3, tier: 2, verified: false}
+  - {ticker: DIA,  name: SPDR Dow Jones Industrial Average ETF, issuer: State Street, family: DJIA_US,    role: CORE,           direction: LONG,  leverage: 1, tier: 2, verified: false}
+  - {ticker: VTI,  name: Vanguard Total Stock Market ETF,       issuer: Vanguard, family: CRSP_TOTAL_US,  role: CORE,           direction: LONG,  leverage: 1, tier: 2, verified: false}
+
+  # ── Style ──
+  - {ticker: IWF,  name: iShares Russell 1000 Growth ETF,       issuer: iShares,  family: R1000_GROWTH_US,  role: CORE, direction: LONG, leverage: 1, tier: 2, verified: false}
+  - {ticker: IWD,  name: iShares Russell 1000 Value ETF,        issuer: iShares,  family: R1000_VALUE_US,   role: CORE, direction: LONG, leverage: 1, tier: 2, verified: false}
+  - {ticker: SCHD, name: Schwab US Dividend Equity ETF,         issuer: Schwab,   family: DJ_DIV100_US,     role: CORE, direction: LONG, leverage: 1, tier: 2, verified: false}
+  - {ticker: USMV, name: iShares MSCI USA Min Vol Factor ETF,   issuer: iShares,  family: MSCI_USA_MINVOL,  role: CORE, direction: LONG, leverage: 1, tier: 2, verified: false}
+  - {ticker: SPHB, name: Invesco S&P 500 High Beta ETF,         issuer: Invesco,  family: SP500_HIGH_BETA,  role: CORE, direction: LONG, leverage: 1, tier: 3, verified: false}
+  - {ticker: QUAL, name: iShares MSCI USA Quality Factor ETF,   issuer: iShares,  family: MSCI_USA_QUALITY, role: CORE, direction: LONG, leverage: 1, tier: 3, verified: false}
+
+  # ── Sectors ──
+  - {ticker: XLK,  name: Technology Select Sector SPDR,          issuer: State Street, family: SECTOR_TECH_US,     role: CORE,           direction: LONG,  leverage: 1, tier: 1, verified: false}
+  - {ticker: TECL, name: Direxion Daily Technology Bull 3X,      issuer: Direxion,     family: SECTOR_TECH_US,     role: LEVERAGED_BULL, direction: LONG,  leverage: 3, tier: 2, verified: false}
+  - {ticker: TECS, name: Direxion Daily Technology Bear 3X,      issuer: Direxion,     family: SECTOR_TECH_US,     role: LEVERAGED_BEAR, direction: SHORT, leverage: 3, tier: 3, verified: false}
+  - {ticker: XLC,  name: Communication Services Select Sector SPDR, issuer: State Street, family: SECTOR_COMM_US,  role: CORE,           direction: LONG,  leverage: 1, tier: 1, verified: false}
+  - {ticker: XLY,  name: Consumer Discretionary Select Sector SPDR, issuer: State Street, family: SECTOR_DISC_US,  role: CORE,           direction: LONG,  leverage: 1, tier: 1, verified: false}
+  - {ticker: XLP,  name: Consumer Staples Select Sector SPDR,     issuer: State Street, family: SECTOR_STAPLES_US,  role: CORE,           direction: LONG,  leverage: 1, tier: 1, verified: false}
+  - {ticker: XLF,  name: Financial Select Sector SPDR,           issuer: State Street, family: SECTOR_FIN_US,      role: CORE,           direction: LONG,  leverage: 1, tier: 1, verified: false}
+  - {ticker: FAS,  name: Direxion Daily Financial Bull 3X,       issuer: Direxion,     family: SECTOR_FIN_US,      role: LEVERAGED_BULL, direction: LONG,  leverage: 3, tier: 2, verified: false}
+  - {ticker: FAZ,  name: Direxion Daily Financial Bear 3X,       issuer: Direxion,     family: SECTOR_FIN_US,      role: LEVERAGED_BEAR, direction: SHORT, leverage: 3, tier: 3, verified: false}
+  - {ticker: XLV,  name: Health Care Select Sector SPDR,         issuer: State Street, family: SECTOR_HEALTH_US,   role: CORE,           direction: LONG,  leverage: 1, tier: 1, verified: false}
+  - {ticker: XLI,  name: Industrial Select Sector SPDR,          issuer: State Street, family: SECTOR_INDU_US,     role: CORE,           direction: LONG,  leverage: 1, tier: 1, verified: false}
+  - {ticker: XLE,  name: Energy Select Sector SPDR,              issuer: State Street, family: SECTOR_ENERGY_US,   role: CORE,           direction: LONG,  leverage: 1, tier: 1, verified: false}
+  - {ticker: ERX,  name: Direxion Daily Energy Bull 2X,          issuer: Direxion,     family: SECTOR_ENERGY_US,   role: LEVERAGED_BULL, direction: LONG,  leverage: 2, tier: 3, verified: false}
+  - {ticker: ERY,  name: Direxion Daily Energy Bear 2X,          issuer: Direxion,     family: SECTOR_ENERGY_US,   role: LEVERAGED_BEAR, direction: SHORT, leverage: 2, tier: 3, verified: false}
+  - {ticker: XLB,  name: Materials Select Sector SPDR,           issuer: State Street, family: SECTOR_MATERIALS_US, role: CORE,          direction: LONG,  leverage: 1, tier: 1, verified: false}
+  - {ticker: XLU,  name: Utilities Select Sector SPDR,           issuer: State Street, family: SECTOR_UTIL_US,     role: CORE,           direction: LONG,  leverage: 1, tier: 1, verified: false}
+  - {ticker: XLRE, name: Real Estate Select Sector SPDR,         issuer: State Street, family: SECTOR_REIT_US,     role: CORE,           direction: LONG,  leverage: 1, tier: 2, verified: false}
+
+  # ── Industries ──
+  - {ticker: SOXX, name: iShares Semiconductor ETF,              issuer: iShares,  family: SEMI_ICE_US,       role: CORE,           direction: LONG,  leverage: 1, tier: 1, verified: false}
+  - {ticker: SOXL, name: Direxion Daily Semiconductor Bull 3X,   issuer: Direxion, family: SEMI_ICE_US,       role: LEVERAGED_BULL, direction: LONG,  leverage: 3, tier: 1, verified: false}
+  - {ticker: SOXS, name: Direxion Daily Semiconductor Bear 3X,   issuer: Direxion, family: SEMI_ICE_US,       role: LEVERAGED_BEAR, direction: SHORT, leverage: 3, tier: 1, verified: false}
+  - {ticker: SMH,  name: VanEck Semiconductor ETF,               issuer: VanEck,   family: SEMI_MVIS_US,      role: CORE,           direction: LONG,  leverage: 1, tier: 1, verified: false}
+  - {ticker: IGV,  name: iShares Expanded Tech-Software Sector ETF, issuer: iShares, family: SOFTWARE_US,     role: CORE,           direction: LONG,  leverage: 1, tier: 2, verified: false}
+  - {ticker: KBE,  name: SPDR S&P Bank ETF,                      issuer: State Street, family: BANKS_US,      role: CORE,           direction: LONG,  leverage: 1, tier: 2, verified: false}
+  - {ticker: KRE,  name: SPDR S&P Regional Banking ETF,          issuer: State Street, family: REGIONAL_BANKS_US, role: CORE,       direction: LONG,  leverage: 1, tier: 1, verified: false}
+  - {ticker: XOP,  name: SPDR S&P Oil & Gas Exploration & Production ETF, issuer: State Street, family: OILGAS_EP_US, role: CORE,   direction: LONG,  leverage: 1, tier: 2, verified: false}
+  - {ticker: XBI,  name: SPDR S&P Biotech ETF,                   issuer: State Street, family: BIOTECH_SPSI_US, role: CORE,         direction: LONG,  leverage: 1, tier: 1, verified: false}
+  - {ticker: LABU, name: Direxion Daily S&P Biotech Bull 3X,     issuer: Direxion, family: BIOTECH_SPSI_US,   role: LEVERAGED_BULL, direction: LONG,  leverage: 3, tier: 2, verified: false}
+  - {ticker: LABD, name: Direxion Daily S&P Biotech Bear 3X,     issuer: Direxion, family: BIOTECH_SPSI_US,   role: LEVERAGED_BEAR, direction: SHORT, leverage: 3, tier: 2, verified: false}
+  - {ticker: ITA,  name: iShares US Aerospace & Defense ETF,     issuer: iShares,  family: AERO_DEF_US,       role: CORE,           direction: LONG,  leverage: 1, tier: 2, verified: false}
+  - {ticker: XRT,  name: SPDR S&P Retail ETF,                    issuer: State Street, family: RETAIL_US,     role: CORE,           direction: LONG,  leverage: 1, tier: 2, verified: false}
+
+  # ── Gold miners ──
+  - {ticker: GDX,  name: VanEck Gold Miners ETF,                 issuer: VanEck,   family: GOLD_MINERS,        role: CORE,           direction: LONG,  leverage: 1, tier: 1, verified: false}
+  - {ticker: NUGT, name: Direxion Daily Gold Miners Index Bull 2X, issuer: Direxion, family: GOLD_MINERS,      role: LEVERAGED_BULL, direction: LONG,  leverage: 2, tier: 2, verified: false}
+  - {ticker: DUST, name: Direxion Daily Gold Miners Index Bear 2X, issuer: Direxion, family: GOLD_MINERS,      role: LEVERAGED_BEAR, direction: SHORT, leverage: 2, tier: 2, verified: false}
+  - {ticker: GDXJ, name: VanEck Junior Gold Miners ETF,          issuer: VanEck,   family: JUNIOR_GOLD_MINERS, role: CORE,           direction: LONG,  leverage: 1, tier: 2, verified: false}
+
+  # ── Regions ──
+  - {ticker: ACWI, name: iShares MSCI ACWI ETF,                  issuer: iShares,  family: ACWI_GLOBAL,  role: CORE,           direction: LONG,  leverage: 1, tier: 2, verified: false}
+  - {ticker: EWH,  name: iShares MSCI Hong Kong ETF,             issuer: iShares,  family: MSCI_HK,      role: CORE,           direction: LONG,  leverage: 1, tier: 2, verified: false}
+  - {ticker: FXI,  name: iShares China Large-Cap ETF,            issuer: iShares,  family: FTSE_CHINA50, role: CORE,           direction: LONG,  leverage: 1, tier: 1, verified: false}
+  - {ticker: YINN, name: Direxion Daily FTSE China Bull 3X,      issuer: Direxion, family: FTSE_CHINA50, role: LEVERAGED_BULL, direction: LONG,  leverage: 3, tier: 2, verified: false}
+  - {ticker: YANG, name: Direxion Daily FTSE China Bear 3X,      issuer: Direxion, family: FTSE_CHINA50, role: LEVERAGED_BEAR, direction: SHORT, leverage: 3, tier: 2, verified: false}
+  - {ticker: MCHI, name: iShares MSCI China ETF,                 issuer: iShares,  family: CHINA_MSCI,   role: CORE,           direction: LONG,  leverage: 1, tier: 2, verified: false}
+  - {ticker: EWJ,  name: iShares MSCI Japan ETF,                 issuer: iShares,  family: MSCI_JAPAN,   role: CORE,           direction: LONG,  leverage: 1, tier: 2, verified: false}
+  - {ticker: VGK,  name: Vanguard FTSE Europe ETF,               issuer: Vanguard, family: FTSE_EUROPE,  role: CORE,           direction: LONG,  leverage: 1, tier: 2, verified: false}
+  - {ticker: INDA, name: iShares MSCI India ETF,                 issuer: iShares,  family: MSCI_INDIA,   role: CORE,           direction: LONG,  leverage: 1, tier: 2, verified: false}
+  - {ticker: EWT,  name: iShares MSCI Taiwan ETF,                issuer: iShares,  family: MSCI_TAIWAN,  role: CORE,           direction: LONG,  leverage: 1, tier: 2, verified: false}
+  - {ticker: EWY,  name: iShares MSCI South Korea ETF,           issuer: iShares,  family: MSCI_KOREA,   role: CORE,           direction: LONG,  leverage: 1, tier: 2, verified: false, theme_tags: [MEMORY_PROXY]}
+  - {ticker: EEM,  name: iShares MSCI Emerging Markets ETF,      issuer: iShares,  family: MSCI_EM,      role: CORE,           direction: LONG,  leverage: 1, tier: 1, verified: false}
+
+  # ── Themes ──
+  - {ticker: AIQ,  name: Global X Artificial Intelligence & Technology ETF, issuer: Global X, family: AI_BIGDATA,  role: THEMATIC, direction: LONG, leverage: 1, tier: 3, verified: false}
+  - {ticker: CIBR, name: First Trust NASDAQ Cybersecurity ETF,   issuer: First Trust, family: CYBERSECURITY,  role: THEMATIC, direction: LONG, leverage: 1, tier: 3, verified: false}
+  - {ticker: ARKK, name: ARK Innovation ETF,                     issuer: ARK,      family: ARK_INNOVATION,    role: THEMATIC, direction: LONG, leverage: 1, tier: 2, verified: false}
+  - {ticker: KWEB, name: KraneShares CSI China Internet ETF,     issuer: KraneShares, family: CHINA_INTERNET, role: THEMATIC, direction: LONG, leverage: 1, tier: 2, verified: false}
+  - {ticker: URA,  name: Global X Uranium ETF,                   issuer: Global X, family: URANIUM_NUCLEAR,   role: THEMATIC, direction: LONG, leverage: 1, tier: 3, verified: false}
+
+  # ── Bonds / cash-like ──
+  - {ticker: TLT,  name: iShares 20+ Year Treasury Bond ETF,     issuer: iShares,  family: UST_20Y_PLUS, role: CORE,           direction: LONG,  leverage: 1, tier: 1, verified: false}
+  - {ticker: TMF,  name: Direxion Daily 20+ Year Treasury Bull 3X, issuer: Direxion, family: UST_20Y_PLUS, role: LEVERAGED_BULL, direction: LONG,  leverage: 3, tier: 2, verified: false}
+  - {ticker: TMV,  name: Direxion Daily 20+ Year Treasury Bear 3X, issuer: Direxion, family: UST_20Y_PLUS, role: LEVERAGED_BEAR, direction: SHORT, leverage: 3, tier: 3, verified: false}
+  - {ticker: IEF,  name: iShares 7-10 Year Treasury Bond ETF,    issuer: iShares,  family: UST_7_10Y,    role: CORE,           direction: LONG,  leverage: 1, tier: 2, verified: false}
+  - {ticker: SHY,  name: iShares 1-3 Year Treasury Bond ETF,     issuer: iShares,  family: UST_1_3Y,     role: CORE,           direction: LONG,  leverage: 1, tier: 2, verified: false}
+  - {ticker: LQD,  name: iShares iBoxx $ Investment Grade Corporate Bond ETF, issuer: iShares, family: US_IG_CORP, role: CORE,  direction: LONG,  leverage: 1, tier: 2, verified: false}
+  - {ticker: HYG,  name: iShares iBoxx $ High Yield Corporate Bond ETF, issuer: iShares, family: US_HY_CORP, role: CORE,       direction: LONG,  leverage: 1, tier: 1, verified: false}
+  - {ticker: SGOV, name: iShares 0-3 Month Treasury Bond ETF,    issuer: iShares,  family: US_TBILLS,    role: CORE,           direction: LONG,  leverage: 1, tier: 2, verified: false}
+
+  # ── Precious metals ──
+  - {ticker: GLD,  name: SPDR Gold Shares,                       issuer: State Street, family: GOLD_SPOT,  role: CORE,             direction: LONG,  leverage: 1, tier: 1, verified: false}
+  - {ticker: IAU,  name: iShares Gold Trust,                     issuer: iShares,  family: GOLD_SPOT,      role: ALTERNATIVE_CORE, direction: LONG,  leverage: 1, tier: 1, verified: false}
+  - {ticker: SLV,  name: iShares Silver Trust,                   issuer: iShares,  family: SILVER_SPOT,    role: CORE,             direction: LONG,  leverage: 1, tier: 1, verified: false}
+  - {ticker: AGQ,  name: ProShares Ultra Silver,                 issuer: ProShares, family: SILVER_BBG_2X, role: LEVERAGED_BULL,   direction: LONG,  leverage: 2, tier: 2, verified: false}
+  - {ticker: ZSL,  name: ProShares UltraShort Silver,            issuer: ProShares, family: SILVER_BBG_2X, role: LEVERAGED_BEAR,   direction: SHORT, leverage: 2, tier: 3, verified: false}
+
+  # ── Commodities ──
+  - {ticker: DBC,  name: Invesco DB Commodity Index Tracking Fund, issuer: Invesco, family: COMMODITY_BROAD, role: CORE,           direction: LONG,  leverage: 1, tier: 2, verified: false}
+  - {ticker: USO,  name: United States Oil Fund,                 issuer: USCF,     family: WTI_USO,         role: CORE,           direction: LONG,  leverage: 1, tier: 1, verified: false}
+  - {ticker: UCO,  name: ProShares Ultra Bloomberg Crude Oil,    issuer: ProShares, family: WTI_BBG_2X,     role: LEVERAGED_BULL, direction: LONG,  leverage: 2, tier: 2, verified: false}
+  - {ticker: UNG,  name: United States Natural Gas Fund,         issuer: USCF,     family: NATGAS_UNG,      role: CORE,           direction: LONG,  leverage: 1, tier: 2, verified: false}
+  - {ticker: CPER, name: United States Copper Index Fund,        issuer: USCF,     family: COPPER_CPER,     role: CORE,           direction: LONG,  leverage: 1, tier: 3, verified: false}
+
+  # ── Currency / Crypto / Volatility ──
+  - {ticker: UUP,  name: Invesco DB US Dollar Index Bullish Fund, issuer: Invesco, family: USD_LONG,        role: CORE,             direction: LONG, leverage: 1,   tier: 3, verified: false}
+  - {ticker: IBIT, name: iShares Bitcoin Trust ETF,              issuer: iShares,  family: BITCOIN_SPOT,    role: CORE,             direction: LONG, leverage: 1,   tier: 1, verified: false}
+  - {ticker: FBTC, name: Fidelity Wise Origin Bitcoin Fund,      issuer: Fidelity, family: BITCOIN_SPOT,    role: ALTERNATIVE_CORE, direction: LONG, leverage: 1,   tier: 2, verified: false}
+  - {ticker: ETHA, name: iShares Ethereum Trust ETF,             issuer: iShares,  family: ETHER_SPOT,      role: CORE,             direction: LONG, leverage: 1,   tier: 2, verified: false}
+  - {ticker: VIXY, name: ProShares VIX Short-Term Futures ETF,   issuer: ProShares, family: VIX_ST_FUTURES, role: CORE,             direction: LONG, leverage: 1,   tier: 2, verified: false}
+  - {ticker: UVXY, name: ProShares Ultra VIX Short-Term Futures ETF, issuer: ProShares, family: VIX_ST_FUTURES, role: LEVERAGED_BULL, direction: LONG, leverage: 1.5, tier: 1, verified: false, note: "“Bull 波动率” = 恐慌方向；Bull/Bear 因子对 VOLATILITY 节点语义反转，见 temperature-model §5"}

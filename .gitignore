@@ -1,0 +1,39 @@
+# ── Secrets: never commit ──
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+secrets/
+*secret*
+*token*
+*password*
+credentials*
+*.credentials
+config/local*.yaml
+config/*.local.*
+.netrc
+
+# ── Data downloads / caches (reproducible, large) ──
+data/raw/
+data/cache/
+*.parquet
+*.sqlite
+*.db
+
+# ── Python ──
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# ── OS / editor ──
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp

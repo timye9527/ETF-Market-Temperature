@@ -1,0 +1,64 @@
+# DECISIONS — 设计决策日志
+
+格式：编号 · 日期 · 状态（ACCEPTED 已定 / PROPOSED 待 Owner 确认）· 决定 · 理由。
+已定的决定不重复讨论；要推翻，新增一条并引用旧编号。
+
+---
+
+### D-001 · 2026-10-06 · ACCEPTED — Temperature ≠ Signal ≠ Trade
+温度只描述市场状态。任何“买/卖/预测”解释属于 SIGNAL 或 Research 层，与温度分开存储、分开展示。
+理由：Owner 原则（MASTER_PROMPT §17）；也是合规与可信度的底线。
+
+### D-002 · 2026-10-06 · ACCEPTED — 用 Dollar Volume，不用股数成交量
+DV = 未复权收盘价 × 成交股数。
+理由：不同 ETF 单价差异巨大，股数不可比；杠杆 ETF 频繁 reverse split，股数序列会跳变，DV 不受影响；DV 才能做敞口加权（D-005）。复权价不能用于 DV。
+
+### D-003 · 2026-10-06 · ACCEPTED — 同一 Family 的 ETF 不独立投票
+Family 内只取 CORE 的价格；CORE + ALTERNATIVE_CORE 的成交额相加作为关注度；杠杆/反向成员只进入 Bull/Bear 因子，其价格不进入任何因子，其成交额不进入 Volume 因子。
+理由：它们是同一 underlying 的不同包装，多次计入就是 double counting。
+
+### D-004 · 2026-10-06 · ACCEPTED — Family = 指数（或现货资产）身份；Node = 市场概念
+- benchmark 不同 → 不同 Family，即使名字相似（SOXX ≠ SMH；KWEB ≠ CWEB；SLV ≠ AGQ/ZSL）。一个 Node 可挂多个 Family。
+- 实物/现货支持的同一资产（GLD/IAU，IBIT/FBTC）→ 同一 Family（`identity_basis: SPOT_ASSET`），即使参考价提供商不同。
+- 期货滚动策略各自成 Family（`FUTURES_STRATEGY`）。
+- 与现货 Family 不同指数、但对节点情绪有价值的杠杆 ETF → `sentiment_only` Family，价格取同节点的 `price_proxy_family`。
+理由：原 Prompt §27；修正了原 §8 示例中 SOXX/SMH 同 Family 的错误。
+
+### D-005 · 2026-10-06 · ACCEPTED — Bull/Bear 用敞口加权，并只与自身历史比较
+Exposure = DV × |leverage|；BullShare 的因子分是其相对自身 252 日历史的 percentile；同时独立展示 Speculative Appetite 与 Hedging Demand，不把它们压成一个方向结论。
+理由：混合 3x 与 −1x 时原始 DV 失真；不同 Family 有结构性的对冲偏好；高 Bear 成交首先是对冲关注（原 §13）。
+
+### D-006 · 2026-10-06 · ACCEPTED — 资产类不重复
+- Gold、Silver 只在 `PRECIOUS_METALS`；`COMMODITY` 不含贵金属。
+- 金矿股是 `EQUITY/GLOBAL/SECTOR/MATERIALS/GOLD_MINERS`，不是商品。
+- Uranium（URA）是 `THEME/URANIUM_NUCLEAR`（股票主题），不是商品。
+- `REAL_ESTATE` 资产类是指向 `EQUITY/US/SECTOR/REAL_ESTATE` 的视图别名，不挂 Family。
+理由：原 Prompt §4 “不能随意创造重复类别”。
+
+### D-007 · 2026-10-06 · ACCEPTED — 温度描述资产自身，Risk-on/off 是另一层
+Treasury 高温 = 债券价格强（通常 risk-off）。VIX 期货 ETP、美元、T-Bills 为 REFERENCE 模式，不显示“热度”，只作为 Risk Regime 的输入。
+理由：避免“所有东西都热 = 市场很好”的误读。
+
+### D-008 · 2026-10-06 · PROPOSED（待 Owner 确认 Q1）— 方向温度 + 独立 Activity
+温度有方向；Volume 以 Directional Attention 形式进入温度（50 + 0.5 × Activity × sign(5D 收益)）；无方向的 Activity 与温度并排显示。
+理由：否则恐慌下跌（高成交、低趋势）会被合成为 “Neutral”。
+
+### D-009 · 2026-10-06 · ACCEPTED（可被 Q3 推翻）— V1 只用美股上市 ETF
+港股/中国用 EWH、FXI、MCHI、KWEB 代理。单一交易日历与币种，降低数据复杂度。
+已知代价：与本地市场时区错位（美股交易时段反映的是前一个亚洲交易日之后的信息）。V2 加入港股本地 ETF。
+
+### D-010 · 2026-10-06 · ACCEPTED — 可复现
+原始数据按日不可变保存；温度快照可由原始数据 + 当时的 universe 版本完整重算；数字型动态 metadata 不手填进 YAML。
+
+### D-011 · 2026-10-06 · ACCEPTED — 没有工具就不显示温度
+Memory 节点 V1 为 `NO_COVERAGE`：不显示温度，不用不相关 ETF 拼凑。EWY 只作为 `MEMORY_PROXY` 标签展示。
+理由：数据完整性优先于覆盖面。Phase 1b 调研是否已有合格的存储主题 ETF。
+
+### D-012 · 2026-10-06 · ACCEPTED — Universe 控制在 ~100 只以内
+V1：97 只。Tier 1+2 参与计算，Tier 3 只为自身节点出低置信度温度。新增 ETF 必须带来新的信息（新节点、新 Family 或必要的 Bull/Bear 对）。
+
+### D-013 · 2026-10-06 · ACCEPTED — 核验前不使用杠杆/反向成员
+`verified: false` 的 LEVERAGED_* / INVERSE 不进入 Bull/Bear 因子。全部 97 只当前均未核验（研究员知识整理），Phase 1b 逐只对照官网核验。
+
+### D-014 · 2026-10-06 · ACCEPTED — 独立 repository
+本项目只在 `timye9527/etf-market-temperature` 开发，与 AI-supply-chain 完全分离。

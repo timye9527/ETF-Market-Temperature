@@ -1,0 +1,133 @@
+# ETF Market Temperature — Taxonomy nodes (v0.1, 2026-10-06)
+#
+# 规则说明见 docs/taxonomy.md。要点：
+# - 节点 id 是路径，父节点 = 去掉最后一段。树是“互斥分类”：每个 Family 只挂在一个 primary node 上。
+# - THEME/* 是独立维度，不属于 GICS 树；主题 Family 挂在 THEME 节点上，不参与 Sector 温度。
+# - level:      ROOT | ASSET_CLASS | REGION | DIMENSION | SEGMENT | SECTOR | INDUSTRY | SUB_INDUSTRY | THEME
+# - scored:     该节点是否产出 Temperature（DIMENSION 只是分组，不打分）
+# - mode:       DIRECTIONAL = 温度越高 = 该资产价格状态越强；REFERENCE = 只作为参照/风险偏好输入，不在首页显示温度
+# - anchor_family: 节点自身没有直接挂 Family 时，用哪个 Family 代表它的价格（Trend / RS / Volume）
+# - rs_benchmark:  Relative Strength 的比较对象（另一个节点）；为空 = 不计算 RS
+# - status:     ACTIVE | NO_COVERAGE（暂无合格 ETF，不显示温度，绝不伪造）
+
+schema_version: 1
+
+nodes:
+  - {id: MARKET, name: Global Multi-Asset, level: ROOT, scored: false}
+
+  # ───────────────────────── EQUITY ─────────────────────────
+  - {id: EQUITY, name: Equity, level: ASSET_CLASS, scored: true, mode: DIRECTIONAL, anchor_family: ACWI_GLOBAL}
+  - {id: EQUITY/GLOBAL, name: Global Equity, level: REGION, scored: true, mode: DIRECTIONAL, anchor_family: ACWI_GLOBAL}
+  - {id: EQUITY/US, name: US Equity, level: REGION, scored: true, mode: DIRECTIONAL, anchor_family: SP500_US, rs_benchmark: EQUITY/GLOBAL}
+  - {id: EQUITY/US/BROAD, name: US Broad Market, level: DIMENSION, scored: false}
+  - {id: EQUITY/US/BROAD/TOTAL_MARKET, name: US Total Market, level: SEGMENT, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US}
+  - {id: EQUITY/US/BROAD/SP500, name: S&P 500, level: SEGMENT, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/GLOBAL}
+  - {id: EQUITY/US/BROAD/NASDAQ100, name: Nasdaq-100, level: SEGMENT, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US}
+  - {id: EQUITY/US/BROAD/DOW, name: Dow Jones Industrial Average, level: SEGMENT, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US}
+  - {id: EQUITY/US/BROAD/SMALL_CAP, name: US Small Cap (Russell 2000), level: SEGMENT, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US}
+
+  - {id: EQUITY/US/STYLE, name: US Style, level: DIMENSION, scored: false}
+  - {id: EQUITY/US/STYLE/GROWTH, name: US Large Growth, level: SEGMENT, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US}
+  - {id: EQUITY/US/STYLE/VALUE, name: US Large Value, level: SEGMENT, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US}
+  - {id: EQUITY/US/STYLE/DIVIDEND, name: US Dividend, level: SEGMENT, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US}
+  - {id: EQUITY/US/STYLE/LOW_VOLATILITY, name: US Low Volatility, level: SEGMENT, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US}
+  - {id: EQUITY/US/STYLE/HIGH_BETA, name: US High Beta, level: SEGMENT, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US}
+  - {id: EQUITY/US/STYLE/QUALITY, name: US Quality, level: SEGMENT, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US}
+
+  # GICS 11 sectors. RS benchmark = US Equity (S&P 500)
+  - {id: EQUITY/US/SECTOR, name: US Sectors (GICS), level: DIMENSION, scored: false}
+  - {id: EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY, name: Information Technology, level: SECTOR, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US, gics: "45"}
+  - {id: EQUITY/US/SECTOR/COMMUNICATION_SERVICES, name: Communication Services, level: SECTOR, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US, gics: "50"}
+  - {id: EQUITY/US/SECTOR/CONSUMER_DISCRETIONARY, name: Consumer Discretionary, level: SECTOR, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US, gics: "25"}
+  - {id: EQUITY/US/SECTOR/CONSUMER_STAPLES, name: Consumer Staples, level: SECTOR, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US, gics: "30"}
+  - {id: EQUITY/US/SECTOR/FINANCIALS, name: Financials, level: SECTOR, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US, gics: "40"}
+  - {id: EQUITY/US/SECTOR/HEALTH_CARE, name: Health Care, level: SECTOR, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US, gics: "35"}
+  - {id: EQUITY/US/SECTOR/INDUSTRIALS, name: Industrials, level: SECTOR, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US, gics: "20"}
+  - {id: EQUITY/US/SECTOR/ENERGY, name: Energy, level: SECTOR, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US, gics: "10"}
+  - {id: EQUITY/US/SECTOR/MATERIALS, name: Materials, level: SECTOR, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US, gics: "15"}
+  - {id: EQUITY/US/SECTOR/UTILITIES, name: Utilities, level: SECTOR, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US, gics: "55"}
+  - {id: EQUITY/US/SECTOR/REAL_ESTATE, name: Real Estate, level: SECTOR, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US, gics: "60"}
+
+  # Industries (GICS-compatible naming where possible; RS benchmark = parent sector)
+  - {id: EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY/SEMICONDUCTORS, name: Semiconductors, level: INDUSTRY, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY}
+  - {id: EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY/SEMICONDUCTORS/MEMORY, name: Memory & Storage, level: SUB_INDUSTRY, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY/SEMICONDUCTORS, status: NO_COVERAGE, note: "非 GICS 官方 sub-industry（自定义 segment）。V1 尚无经过验证的纯 Memory ETF，见 DECISIONS D-011"}
+  - {id: EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY/SOFTWARE, name: Software, level: INDUSTRY, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY}
+  - {id: EQUITY/US/SECTOR/FINANCIALS/BANKS, name: Banks, level: INDUSTRY, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US/SECTOR/FINANCIALS}
+  - {id: EQUITY/US/SECTOR/FINANCIALS/BANKS/REGIONAL_BANKS, name: Regional Banks, level: SUB_INDUSTRY, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US/SECTOR/FINANCIALS/BANKS}
+  - {id: EQUITY/US/SECTOR/ENERGY/OIL_GAS_EP, name: Oil & Gas Exploration & Production, level: INDUSTRY, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US/SECTOR/ENERGY}
+  - {id: EQUITY/US/SECTOR/HEALTH_CARE/BIOTECHNOLOGY, name: Biotechnology, level: INDUSTRY, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US/SECTOR/HEALTH_CARE}
+  - {id: EQUITY/US/SECTOR/INDUSTRIALS/AEROSPACE_DEFENSE, name: Aerospace & Defense, level: INDUSTRY, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US/SECTOR/INDUSTRIALS}
+  - {id: EQUITY/US/SECTOR/CONSUMER_DISCRETIONARY/RETAIL, name: Retail, level: INDUSTRY, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US/SECTOR/CONSUMER_DISCRETIONARY}
+
+  # Global industries (holdings are multi-country, so region = GLOBAL)
+  - {id: EQUITY/GLOBAL/SECTOR, name: Global Sectors, level: DIMENSION, scored: false}
+  - {id: EQUITY/GLOBAL/SECTOR/MATERIALS, name: Global Materials, level: SECTOR, scored: false}
+  - {id: EQUITY/GLOBAL/SECTOR/MATERIALS/GOLD_MINERS, name: Gold Miners, level: INDUSTRY, scored: true, mode: DIRECTIONAL, rs_benchmark: PRECIOUS_METALS/GOLD, note: "Gold miners 是 EQUITY，不是 commodity；RS 对比金价本身，衡量经营杠杆"}
+  - {id: EQUITY/GLOBAL/SECTOR/MATERIALS/JUNIOR_GOLD_MINERS, name: Junior Gold Miners, level: SUB_INDUSTRY, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/GLOBAL/SECTOR/MATERIALS/GOLD_MINERS}
+
+  # Non-US regions. RS benchmark = Global Equity
+  - {id: EQUITY/HONG_KONG, name: Hong Kong Equity, level: REGION, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/GLOBAL}
+  - {id: EQUITY/CHINA, name: China Equity, level: REGION, scored: true, mode: DIRECTIONAL, anchor_family: CHINA_MSCI, rs_benchmark: EQUITY/EMERGING_MARKETS}
+  - {id: EQUITY/CHINA/LARGE_CAP, name: China Large Cap (FTSE China 50), level: SEGMENT, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/CHINA}
+  - {id: EQUITY/JAPAN, name: Japan Equity, level: REGION, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/GLOBAL}
+  - {id: EQUITY/EUROPE, name: Europe Equity, level: REGION, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/GLOBAL}
+  - {id: EQUITY/INDIA, name: India Equity, level: REGION, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/EMERGING_MARKETS}
+  - {id: EQUITY/TAIWAN, name: Taiwan Equity, level: REGION, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/EMERGING_MARKETS}
+  - {id: EQUITY/KOREA, name: Korea Equity, level: REGION, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/EMERGING_MARKETS}
+  - {id: EQUITY/EMERGING_MARKETS, name: Emerging Markets Equity, level: REGION, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/GLOBAL}
+
+  # ───────────────────────── THEMES (独立维度，非 GICS) ─────────────────────────
+  - {id: THEME, name: Themes, level: DIMENSION, scored: false}
+  - {id: THEME/AI_INFRASTRUCTURE, name: AI & Big Data, level: THEME, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY, sector_hint: INFORMATION_TECHNOLOGY}
+  - {id: THEME/CYBERSECURITY, name: Cybersecurity, level: THEME, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY/SOFTWARE, sector_hint: INFORMATION_TECHNOLOGY}
+  - {id: THEME/DISRUPTIVE_INNOVATION, name: Disruptive Innovation (Speculative Growth), level: THEME, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US/BROAD/NASDAQ100}
+  - {id: THEME/CHINA_INTERNET, name: China Internet, level: THEME, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/CHINA, sector_hint: COMMUNICATION_SERVICES}
+  - {id: THEME/URANIUM_NUCLEAR, name: Uranium & Nuclear, level: THEME, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US/SECTOR/ENERGY, sector_hint: ENERGY}
+
+  # ───────────────────────── BOND ─────────────────────────
+  - {id: BOND, name: Bonds, level: ASSET_CLASS, scored: true, mode: DIRECTIONAL, anchor_family: UST_7_10Y}
+  - {id: BOND/US, name: US Bonds, level: REGION, scored: false}
+  - {id: BOND/US/TREASURY, name: US Treasury, level: SEGMENT, scored: true, mode: DIRECTIONAL, anchor_family: UST_7_10Y, note: "温度 = 债券价格状态（收益率下降 = 升温）。高温通常是 risk-off，不是 risk-on，见 D-007"}
+  - {id: BOND/US/TREASURY/SHORT, name: Treasury 1-3Y, level: SEGMENT, scored: true, mode: DIRECTIONAL, rs_benchmark: CASH_LIKE/US/TBILLS}
+  - {id: BOND/US/TREASURY/INTERMEDIATE, name: Treasury 7-10Y, level: SEGMENT, scored: true, mode: DIRECTIONAL, rs_benchmark: BOND/US/TREASURY/SHORT}
+  - {id: BOND/US/TREASURY/LONG, name: Treasury 20Y+, level: SEGMENT, scored: true, mode: DIRECTIONAL, rs_benchmark: BOND/US/TREASURY/INTERMEDIATE}
+  - {id: BOND/US/CREDIT, name: US Corporate Credit, level: DIMENSION, scored: false}
+  - {id: BOND/US/CREDIT/INVESTMENT_GRADE, name: US Investment Grade, level: SEGMENT, scored: true, mode: DIRECTIONAL, rs_benchmark: BOND/US/TREASURY/INTERMEDIATE}
+  - {id: BOND/US/CREDIT/HIGH_YIELD, name: US High Yield, level: SEGMENT, scored: true, mode: DIRECTIONAL, rs_benchmark: BOND/US/TREASURY/INTERMEDIATE, note: "HY vs Treasury 的 RS 是重要 risk-on/off 输入"}
+
+  # ───────────────────────── PRECIOUS_METALS ─────────────────────────
+  - {id: PRECIOUS_METALS, name: Precious Metals, level: ASSET_CLASS, scored: true, mode: DIRECTIONAL, anchor_family: GOLD_SPOT}
+  - {id: PRECIOUS_METALS/GOLD, name: Gold, level: SEGMENT, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US}
+  - {id: PRECIOUS_METALS/SILVER, name: Silver, level: SEGMENT, scored: true, mode: DIRECTIONAL, rs_benchmark: PRECIOUS_METALS/GOLD}
+
+  # ───────────────────────── COMMODITY (不含贵金属，见 D-006) ─────────────────────────
+  - {id: COMMODITY, name: Commodities (ex Precious Metals), level: ASSET_CLASS, scored: true, mode: DIRECTIONAL, anchor_family: COMMODITY_BROAD}
+  - {id: COMMODITY/BROAD, name: Broad Commodities, level: SEGMENT, scored: true, mode: DIRECTIONAL}
+  - {id: COMMODITY/ENERGY, name: Energy Commodities, level: DIMENSION, scored: false}
+  - {id: COMMODITY/ENERGY/CRUDE_OIL, name: Crude Oil (WTI futures), level: SEGMENT, scored: true, mode: DIRECTIONAL, rs_benchmark: COMMODITY/BROAD}
+  - {id: COMMODITY/ENERGY/NATURAL_GAS, name: Natural Gas (futures), level: SEGMENT, scored: true, mode: DIRECTIONAL, rs_benchmark: COMMODITY/BROAD}
+  - {id: COMMODITY/INDUSTRIAL_METALS, name: Industrial Metals, level: DIMENSION, scored: false}
+  - {id: COMMODITY/INDUSTRIAL_METALS/COPPER, name: Copper (futures), level: SEGMENT, scored: true, mode: DIRECTIONAL, rs_benchmark: COMMODITY/BROAD}
+
+  # ───────────────────────── CURRENCY ─────────────────────────
+  - {id: CURRENCY, name: Currencies, level: ASSET_CLASS, scored: false}
+  - {id: CURRENCY/USD, name: US Dollar Index, level: SEGMENT, scored: true, mode: REFERENCE, note: "美元强弱是 risk-off 输入，不作为“热门资产”展示"}
+
+  # ───────────────────────── CRYPTO ─────────────────────────
+  - {id: CRYPTO, name: Crypto, level: ASSET_CLASS, scored: true, mode: DIRECTIONAL, anchor_family: BITCOIN_SPOT}
+  - {id: CRYPTO/BITCOIN, name: Bitcoin, level: SEGMENT, scored: true, mode: DIRECTIONAL, rs_benchmark: EQUITY/US/BROAD/NASDAQ100}
+  - {id: CRYPTO/ETHEREUM, name: Ethereum, level: SEGMENT, scored: true, mode: DIRECTIONAL, rs_benchmark: CRYPTO/BITCOIN}
+
+  # ───────────────────────── VOLATILITY ─────────────────────────
+  - {id: VOLATILITY, name: Volatility, level: ASSET_CLASS, scored: false}
+  - {id: VOLATILITY/VIX_SHORT_TERM_FUTURES, name: VIX Short-Term Futures, level: SEGMENT, scored: true, mode: REFERENCE, note: "VIX ETP 有结构性 contango 衰减，价格趋势不可当作“资产升温”；只作为恐慌/对冲需求输入"}
+
+  # ───────────────────────── REAL_ESTATE ─────────────────────────
+  # 上市 REIT ETF 本质是 EQUITY（GICS Real Estate），为避免重复计数，REAL_ESTATE 资产类只是一个
+  # 指向 EQUITY/US/SECTOR/REAL_ESTATE 的视图别名，不挂任何 Family（见 D-006）。
+  - {id: REAL_ESTATE, name: Real Estate (view → EQUITY/US/SECTOR/REAL_ESTATE), level: ASSET_CLASS, scored: false, alias_of: EQUITY/US/SECTOR/REAL_ESTATE}
+
+  # ───────────────────────── CASH_LIKE ─────────────────────────
+  - {id: CASH_LIKE, name: Cash-like, level: ASSET_CLASS, scored: false}
+  - {id: CASH_LIKE/US, name: US Cash-like, level: REGION, scored: false}
+  - {id: CASH_LIKE/US/TBILLS, name: US T-Bills (0-3M), level: SEGMENT, scored: true, mode: REFERENCE, note: "价格几乎无趋势；只用作 RS 基准与“资金停泊”成交额观察"}
