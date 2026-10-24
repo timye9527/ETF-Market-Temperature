@@ -1,0 +1,669 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ETF 市场温度计</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&display=swap">
+</head>
+<body>
+<!--APP-START-->
+<style>
+/* Layout: weather-station bulletin — a ruled board of instrument readings, summary first, detail on demand. */
+:root {
+  --bg: #f3f5f7; --surface: #ffffff; --surface-2: #eaeef2;
+  --ink: #11161d; --ink-2: #47505d; --ink-3: #737d8b; --line: #d9dfe6;
+  --accent: #1d4f91; --focus: #1d4f91;
+  --t0: #1c5cab; --t1: #2a78d6; --t2: #86b6ef; --t3: #c6c7c1; --t4: #f0a088; --t5: #e34948; --t6: #a51f1f;
+  --demo-bg: #fff4d6; --demo-ink: #6b4a00; --demo-line: #ecc766;
+  --good: #0c7d0c; --bad: #c43535;
+  --f-display: "Barlow Condensed", "Arial Narrow", "Noto Sans SC", sans-serif;
+  --f-body: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 6px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e1114; --surface: #161a1f; --surface-2: #1e242b;
+  --ink: #edf0f3; --ink-2: #b3bbc6; --ink-3: #848e9b; --line: #2b323a;
+  --accent: #8db3ea; --focus: #8db3ea;
+  --t0: #4b8ae0; --t1: #3987e5; --t2: #6d9cd6; --t3: #4b4b47; --t4: #d98269; --t5: #e66767; --t6: #f28b80;
+  --demo-bg: #2e2510; --demo-ink: #f3d68a; --demo-line: #6b5520;
+  --good: #4cc44c; --bad: #ef7a7a; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0e1114; --surface: #161a1f; --surface-2: #1e242b;
+  --ink: #edf0f3; --ink-2: #b3bbc6; --ink-3: #848e9b; --line: #2b323a;
+  --accent: #8db3ea; --focus: #8db3ea;
+  --t0: #4b8ae0; --t1: #3987e5; --t2: #6d9cd6; --t3: #4b4b47; --t4: #d98269; --t5: #e66767; --t6: #f28b80;
+  --demo-bg: #2e2510; --demo-ink: #f3d68a; --demo-line: #6b5520;
+  --good: #4cc44c; --bad: #ef7a7a; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 400 14px/1.55 var(--f-body); margin: 0; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 0 48px; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.num { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--f-mono); font-size: 12px; }
+.muted { color: var(--ink-3); }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+
+/* top bar */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+.top .wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; padding-block: 10px; }
+.brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
+.brand b { font: 700 22px/1 var(--f-display); letter-spacing: .02em; }
+.brand span { font: 500 12px var(--f-mono); color: var(--ink-3); letter-spacing: .06em; text-transform: uppercase; }
+nav { display: flex; gap: 2px; flex-wrap: wrap; }
+nav button { border: 0; background: none; padding: 6px 12px; border-radius: var(--r); cursor: pointer; color: var(--ink-2); }
+nav button[aria-current="true"] { background: var(--surface-2); color: var(--ink); font-weight: 500; }
+nav button:hover { color: var(--ink); }
+.asof { font: 12px var(--f-mono); color: var(--ink-3); }
+
+.demo { margin-top: 16px; border: 1px solid var(--demo-line); background: var(--demo-bg); color: var(--demo-ink); border-radius: var(--r); padding: 10px 14px; font-size: 13px; }
+.demo b { font-weight: 700; }
+
+/* section headings */
+.eyebrow { font: 500 11px var(--f-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+.sec { margin-top: 28px; display: grid; gap: 12px; }
+.sec-h { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+.sec-h h2 { font: 600 20px/1.2 var(--f-display); letter-spacing: .02em; }
+
+/* hero */
+.hero { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; margin-top: 20px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px 18px; min-width: 0; }
+.reading { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; }
+.big { font: 700 84px/0.85 var(--f-display); letter-spacing: -.01em; }
+.big sup { font-size: .38em; vertical-align: top; position: relative; top: .25em; margin-left: 2px; color: var(--ink-3); }
+.reading-meta { display: grid; gap: 4px; padding-bottom: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--ink); white-space: nowrap; }
+.chip i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--c, var(--t3)); }
+.delta.up { color: var(--bad); } .delta.down { color: var(--t1); }
+.delta { font: 500 12px var(--f-mono); }
+.hero-spark svg { display: block; width: 100%; height: 56px; margin-top: 12px; }
+.hero-note { color: var(--ink-2); font-size: 13px; margin-top: 10px; max-width: 60ch; }
+
+.gauge-row { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; align-items: center; margin-top: 12px; }
+.gauge-row .lbl { font-size: 12px; color: var(--ink-2); }
+.minibar { height: 6px; border-radius: 3px; background: var(--surface-2); position: relative; }
+.minibar b { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: var(--ink-3); }
+.signal-tag { font: 500 11px var(--f-mono); letter-spacing: .08em; color: var(--accent); border: 1px solid var(--accent); padding: 1px 6px; border-radius: 3px; }
+
+/* board */
+.board { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.group { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 6px 0; min-width: 0; }
+.group h3 { font: 600 15px var(--f-display); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); padding: 8px 16px 6px; }
+.row { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(70px, 1fr) 48px 52px 74px; align-items: center; gap: 10px; padding: 7px 16px; width: 100%; border: 0; background: none; text-align: left; cursor: pointer; border-top: 1px solid var(--line); }
+.row:hover { background: var(--surface-2); }
+.row .nm { min-width: 0; }
+.row .nm b { display: block; font-weight: 500; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .nm span { display: block; font: 11px var(--f-mono); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .t { font: 700 26px/1 var(--f-display); text-align: right; }
+.row .t.na { font: 500 12px var(--f-body); color: var(--ink-3); }
+.row .delta { text-align: right; }
+.row svg { display: block; width: 100%; height: 26px; }
+.row.disabled { cursor: default; } .row.disabled:hover { background: none; }
+
+/* thermometer track */
+.track { position: relative; height: 10px; border-radius: 5px; background: linear-gradient(90deg, var(--t0) 0 15%, var(--t1) 15% 35%, var(--t2) 35% 45%, var(--t3) 45% 55%, var(--t4) 55% 65%, var(--t5) 65% 85%, var(--t6) 85% 100%); opacity: .9; }
+.track .mk { position: absolute; top: -4px; width: 4px; height: 18px; margin-left: -2px; border-radius: 2px; background: var(--ink); box-shadow: 0 0 0 2px var(--surface); }
+.track.empty { background: var(--surface-2); }
+
+/* rotation */
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.seg button { border: 0; background: var(--surface); padding: 4px 12px; cursor: pointer; font-size: 12px; color: var(--ink-2); }
+.seg button[aria-pressed="true"] { background: var(--surface-2); color: var(--ink); font-weight: 500; }
+.chart-box { overflow-x: auto; }
+.chart-box svg text { fill: var(--ink-2); font: 11px var(--f-body); }
+.chart-box svg .ax { stroke: var(--line); }
+.heat { display: grid; gap: 2px; min-width: 640px; }
+.heat .hr { display: grid; grid-template-columns: 120px repeat(var(--cols), minmax(0, 1fr)) 40px; gap: 1px; align-items: center; }
+.heat .hl { font-size: 12px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 8px; border: 0; background: none; text-align: left; cursor: pointer; }
+.heat .hc { height: 18px; }
+.heat .hv { font: 700 15px var(--f-display); text-align: right; }
+.heat .hx { font: 10.5px var(--f-mono); color: var(--ink-3); }
+.rbar { display: grid; grid-template-columns: 70px minmax(0, 1fr) 64px 56px 64px; gap: 10px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); font-size: 12.5px; }
+.rbar .z { position: relative; height: 14px; }
+.rbar .z::before { content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--ink-3); }
+.rbar .z b { position: absolute; top: 2px; height: 10px; border-radius: 2px; }
+.chip.trend { background: var(--surface-2); font-family: var(--f-mono); font-size: 11.5px; }
+.chip.cls { background: transparent; border: 1px solid var(--line); }
+.conf { font-size: 12px; font-weight: 700; color: var(--bad); white-space: nowrap; }
+.conf-t { font-style: normal; color: var(--bad); font-weight: 500; }
+.row .nm span { font-family: var(--f-body); font-size: 11.5px; }
+.chart-box svg text.ql { fill: var(--ink-3); font: 600 12px var(--f-body); letter-spacing: .08em; }
+.chart-box svg text.qn { fill: var(--ink-2); font-size: 11px; }
+.panel.action { border-left: 0; }
+.act-row { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin: 6px 0 10px; }
+.act { font: 700 30px/1 var(--f-display); letter-spacing: .02em; }
+tr.cur td { background: var(--surface-2); font-weight: 700; }
+.ck { display: grid; gap: 0; }
+.ck-i { display: grid; grid-template-columns: minmax(0, 1.6fr) 70px 90px 90px; gap: 8px; align-items: center; padding: 7px 0; border-top: 1px solid var(--line); font-size: 12.5px; }
+.ck-i:first-child { border-top: 0; }
+.ck-i .hot { color: var(--bad); font-weight: 700; } .ck-i .cold { color: var(--t1); font-weight: 700; }
+.stocks { display: flex; flex-wrap: wrap; gap: 6px 10px; }
+.stk { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 4px 10px; font-size: 12.5px; }
+.stk .up { color: var(--bad); } .stk .down { color: var(--t1); }
+.seg.wrap { flex-wrap: wrap; display: flex; }
+tr.dimrow td { color: var(--ink-3); }
+.linkish { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; font-size: 12px; text-align: left; }
+.research-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 1000px) { .research-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 520px) { .ck-i { grid-template-columns: minmax(0, 1fr) 54px 70px; } .ck-i > :last-child { display: none; } }
+.chain { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; }
+.chain .lnk { border: 1px solid var(--line); background: var(--surface); border-radius: var(--r); padding: 8px 12px; min-width: 120px; cursor: pointer; text-align: left; }
+.chain .arrow { align-self: center; color: var(--ink-3); font-family: var(--f-mono); }
+.chain .lnk b { font: 700 24px/1 var(--f-display); }
+
+/* tree */
+.tree { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 6px 0; }
+.trow { display: grid; grid-template-columns: minmax(0, 1fr) 110px 44px 52px; gap: 10px; align-items: center; padding: 5px 16px; border: 0; background: none; width: 100%; text-align: left; cursor: pointer; }
+.trow:hover { background: var(--surface-2); }
+.trow .nm { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trow.dim .nm { color: var(--ink-3); font: 500 11px var(--f-mono); letter-spacing: .08em; text-transform: uppercase; }
+.trow .t { font: 700 18px/1 var(--f-display); text-align: right; }
+
+/* detail */
+.crumbs { display: flex; flex-wrap: wrap; gap: 4px; font-size: 12px; color: var(--ink-3); margin-top: 20px; }
+.crumbs button { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; font-size: 12px; }
+.detail-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: end; margin-top: 8px; }
+.detail-head h1 { font: 700 40px/1.05 var(--f-display); letter-spacing: .01em; }
+.facts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.factor { display: grid; grid-template-columns: 160px minmax(0, 1fr) 40px; gap: 6px 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.factor:first-of-type { border-top: 0; }
+.factor .fn b { display: block; font-weight: 500; }
+.factor .fn span { font-size: 11px; color: var(--ink-3); }
+.factor .v { font: 700 22px/1 var(--f-display); text-align: right; }
+.factor .sub { grid-column: 2 / 4; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11.5px; color: var(--ink-3); }
+.factor .sub em { font-style: normal; color: var(--ink-2); font-family: var(--f-mono); }
+.factor.na .v { font: 500 12px var(--f-body); color: var(--ink-3); }
+.bar { height: 8px; background: var(--surface-2); border-radius: 4px; position: relative; }
+.bar b { position: absolute; inset: 0 auto 0 0; border-radius: 4px; }
+.bar::after { content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--ink-3); opacity: .5; }
+
+.tbl-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+th { text-align: left; font: 500 11px var(--f-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td.r, th.r { text-align: right; }
+tr.fam td { background: var(--surface-2); font-weight: 500; white-space: normal; }
+.role { font: 500 10.5px var(--f-mono); letter-spacing: .04em; padding: 1px 6px; border-radius: 3px; border: 1px solid var(--line); color: var(--ink-2); }
+.ok { color: var(--good); } .warn { color: var(--bad); }
+
+.hist-ctl { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.histsvg { width: 100%; height: 240px; display: block; }
+.histsvg text { fill: var(--ink-3); font: 10.5px var(--f-mono); }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; font-size: 12px; box-shadow: 0 4px 14px rgb(0 0 0 / .12); white-space: nowrap; z-index: 9; }
+.rel { position: relative; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--ink-2); }
+.prose { max-width: 70ch; color: var(--ink-2); display: grid; gap: 10px; }
+.prose h3 { color: var(--ink); font: 600 17px var(--f-display); letter-spacing: .03em; margin-top: 8px; }
+.prose code { font-family: var(--f-mono); font-size: 12px; background: var(--surface-2); padding: 1px 4px; border-radius: 3px; }
+.foot { margin-top: 40px; border-top: 1px solid var(--line); padding-top: 12px; font-size: 12px; color: var(--ink-3); display: grid; gap: 4px; }
+
+@media (max-width: 860px) {
+  .hero, .board, .two { grid-template-columns: minmax(0, 1fr); }
+  .big { font-size: 68px; }
+}
+@media (max-width: 520px) {
+  .row { grid-template-columns: minmax(0, 1fr) 44px 48px; }
+  .row .trk, .row .spark { display: none; }
+  .trow { grid-template-columns: minmax(0, 1fr) 40px 48px; }
+  .trow .trk { display: none; }
+  .factor { grid-template-columns: 96px minmax(0, 1fr) 36px; }
+  .detail-head { grid-template-columns: minmax(0, 1fr); }
+  .detail-head h1 { font-size: 32px; }
+}
+@media (prefers-reduced-motion: no-preference) { .track .mk { transition: left .4s ease; } }
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><b>ETF 市场温度计</b><span>Market Temperature</span></div>
+    <nav id="nav" aria-label="页面">
+      <button data-view="overview">总览</button>
+      <button data-view="rotation">资金轮动</button>
+      <button data-view="tree">市场树</button>
+      <button data-view="pool">ETF 池</button>
+      <button data-view="research">研究</button>
+      <button data-view="method">方法</button>
+    </nav>
+    <span class="asof" id="asof"></span>
+  </div>
+</header>
+
+<main class="wrap" id="app"></main>
+
+<script src="data.js"></script>
+<script>
+(() => {
+const D = window.ETF_TEMP;
+const app = document.getElementById("app");
+if (!D) { app.innerHTML = '<p class="demo">没有找到数据文件 data.js。请先运行 <code>python3 -m etf_temperature.build</code>。</p>'; return; }
+const V2 = D.meta.version === "v2";
+const N = D.nodes, E = D.etfs, F = D.families, S = D.stocks || {};
+const BAND = { EXTREME_COLD: ["极冷", "Extreme Cold", 0], COLD: ["冷", "Cold", 1], COOL: ["偏冷", "Cool", 2],
+  NEUTRAL: ["中性", "Neutral", 3], WARM: ["偏暖", "Warm", 4], HOT: ["热", "Hot", 5], EXTREME_HOT: ["极热", "Extreme Hot", 6] };
+const FACT = V2 ? [
+  ["stretch", "偏离趋势", "离自己的 6 个月与 1 年趋势线多远（回归偏离）· 周线 RSI"],
+  ["accel", "动量加速", "20/60 日涨跌减去趋势应有的涨幅"],
+  ["crowding", "拥挤度", "带方向的成交额 · 杠杆多空"],
+  ["breadth", "广度", "子板块 ETF 与所属大市值股站上 50 日线、创新高/新低"],
+  ["rs", "相对强弱偏离", "相对上级板块的比价，同样看偏离趋势"],
+] : [["trend", "趋势", ""], ["volume", "成交", ""], ["bullbear", "多空杠杆", ""], ["rs", "相对强弱", ""], ["breadth", "广度", ""]];
+const ROLE = { CORE: "核心", ALTERNATIVE_CORE: "替代核心", LEVERAGED_BULL: "杠杆多", LEVERAGED_BEAR: "杠杆空", INVERSE: "反向", THEMATIC: "主题", SATELLITE: "卫星", PROXY: "代理" };
+const TREND = { STRONG_UP: ["强上升", "↑↑"], UP: ["上升", "↑"], FLAT: ["震荡", "→"], DOWN: ["下降", "↓"], STRONG_DOWN: ["强下降", "↓↓"] };
+const CLS = D.meta.classes || {};
+const ACT = D.meta.actions || {};
+const BUCKET = { US_BROAD: "美股宽基与风格", US_SECTOR: "美股行业（GICS）", US_INDUSTRY: "美股细分行业", THEME: "主题",
+  LEVERAGED_INDEX: "指数/行业杠杆与反向", LEVERAGED_SINGLE_STOCK: "单股杠杆与反向", BOND: "债券", COMMODITY: "商品与贵金属",
+  INTERNATIONAL: "国际（美股上市）", CRYPTO: "加密", REFERENCE: "参照" };
+const REASON = { TOP_N: "Top " + (D.meta.top_n || 20), COVERAGE: "覆盖节点", PAIR: "配对补全", LEVERAGE_BLOCK: "杠杆块", ALT_CORE: "替代核心" };
+const ZH = {
+  "EQUITY": "全球股票", "EQUITY/GLOBAL": "全球股票 ACWI", "EQUITY/US": "美股", "EQUITY/US/BROAD/SP500": "标普 500",
+  "EQUITY/US/BROAD/NASDAQ100": "纳斯达克 100", "EQUITY/US/BROAD/SMALL_CAP": "美国小盘", "EQUITY/US/BROAD/DOW": "道琼斯",
+  "EQUITY/US/BROAD/TOTAL_MARKET": "美国全市场", "EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY": "科技",
+  "EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY/SEMICONDUCTORS": "半导体", "EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY/SEMICONDUCTORS/MEMORY": "存储 Memory",
+  "EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY/SOFTWARE": "软件", "EQUITY/US/SECTOR/COMMUNICATION_SERVICES": "通信服务",
+  "EQUITY/US/SECTOR/CONSUMER_DISCRETIONARY": "可选消费", "EQUITY/US/SECTOR/CONSUMER_STAPLES": "必选消费",
+  "EQUITY/US/SECTOR/FINANCIALS": "金融", "EQUITY/US/SECTOR/FINANCIALS/BANKS": "银行", "EQUITY/US/SECTOR/FINANCIALS/BANKS/REGIONAL_BANKS": "地区银行",
+  "EQUITY/US/SECTOR/HEALTH_CARE": "医疗保健", "EQUITY/US/SECTOR/HEALTH_CARE/BIOTECHNOLOGY": "生物科技",
+  "EQUITY/US/SECTOR/INDUSTRIALS": "工业", "EQUITY/US/SECTOR/INDUSTRIALS/AEROSPACE_DEFENSE": "航空航天与国防",
+  "EQUITY/US/SECTOR/ENERGY": "能源", "EQUITY/US/SECTOR/ENERGY/OIL_GAS_EP": "油气勘探开采", "EQUITY/US/SECTOR/MATERIALS": "原材料",
+  "EQUITY/US/SECTOR/UTILITIES": "公用事业", "EQUITY/US/SECTOR/REAL_ESTATE": "房地产", "EQUITY/US/SECTOR/CONSUMER_DISCRETIONARY/RETAIL": "零售",
+  "EQUITY/US/STYLE/GROWTH": "成长", "EQUITY/US/STYLE/VALUE": "价值", "EQUITY/US/STYLE/DIVIDEND": "红利",
+  "EQUITY/US/STYLE/LOW_VOLATILITY": "低波动", "EQUITY/US/STYLE/HIGH_BETA": "高 Beta", "EQUITY/US/STYLE/QUALITY": "质量",
+  "EQUITY/GLOBAL/SECTOR/MATERIALS/GOLD_MINERS": "金矿股", "EQUITY/GLOBAL/SECTOR/MATERIALS/JUNIOR_GOLD_MINERS": "小型金矿股",
+  "EQUITY/HONG_KONG": "香港", "EQUITY/CHINA": "中国", "EQUITY/CHINA/LARGE_CAP": "中国大盘", "EQUITY/JAPAN": "日本",
+  "EQUITY/EUROPE": "欧洲", "EQUITY/INDIA": "印度", "EQUITY/TAIWAN": "台湾", "EQUITY/KOREA": "韩国", "EQUITY/EMERGING_MARKETS": "新兴市场",
+  "THEME/AI_INFRASTRUCTURE": "AI 与大数据", "THEME/CYBERSECURITY": "网络安全", "THEME/DISRUPTIVE_INNOVATION": "颠覆式创新",
+  "THEME/CHINA_INTERNET": "中概互联网", "THEME/URANIUM_NUCLEAR": "铀与核能",
+  "BOND": "债券", "BOND/US/TREASURY": "美国国债", "BOND/US/TREASURY/SHORT": "1-3 年国债", "BOND/US/TREASURY/INTERMEDIATE": "7-10 年国债",
+  "BOND/US/TREASURY/LONG": "20 年+ 国债", "BOND/US/CREDIT/INVESTMENT_GRADE": "投资级公司债", "BOND/US/CREDIT/HIGH_YIELD": "高收益债",
+  "PRECIOUS_METALS": "贵金属", "PRECIOUS_METALS/GOLD": "黄金", "PRECIOUS_METALS/SILVER": "白银",
+  "COMMODITY": "商品", "COMMODITY/BROAD": "综合商品", "COMMODITY/ENERGY/CRUDE_OIL": "原油", "COMMODITY/ENERGY/NATURAL_GAS": "天然气",
+  "COMMODITY/INDUSTRIAL_METALS/COPPER": "铜", "CURRENCY/USD": "美元", "CRYPTO": "加密资产", "CRYPTO/BITCOIN": "比特币", "CRYPTO/ETHEREUM": "以太坊",
+  "VOLATILITY/VIX_SHORT_TERM_FUTURES": "VIX 短期期货", "CASH_LIKE/US/TBILLS": "短期国库券", "THEME": "主题", "MARKET": "全市场",
+};
+ZH["EQUITY/US/BROAD/MID_CAP"] = "美国中盘"; ZH["EQUITY/US/BROAD/SP500_EQUAL"] = "标普 500 等权";
+ZH["EQUITY/US/STYLE/MOMENTUM"] = "动量"; ZH["EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY/SEMICONDUCTORS/EQUIPMENT"] = "半导体设备与光刻";
+ZH["EQUITY/US/SECTOR/FINANCIALS/INSURANCE"] = "保险"; ZH["EQUITY/US/SECTOR/FINANCIALS/CAPITAL_MARKETS"] = "券商与交易所";
+ZH["EQUITY/US/SECTOR/ENERGY/OIL_SERVICES"] = "油服"; ZH["EQUITY/US/SECTOR/HEALTH_CARE/MEDICAL_DEVICES"] = "医疗器械";
+ZH["EQUITY/US/SECTOR/INDUSTRIALS/TRANSPORTATION"] = "运输"; ZH["EQUITY/US/SECTOR/INDUSTRIALS/AIRLINES"] = "航空";
+ZH["EQUITY/US/SECTOR/CONSUMER_DISCRETIONARY/HOMEBUILDERS"] = "房屋建筑"; ZH["EQUITY/US/SECTOR/MATERIALS/METALS_MINING"] = "金属与采矿";
+ZH["EQUITY/GLOBAL/SECTOR/MATERIALS/COPPER_MINERS"] = "铜矿股"; ZH["EQUITY/DEVELOPED_EX_US"] = "发达市场（除美国）";
+ZH["EQUITY/BRAZIL"] = "巴西"; ZH["EQUITY/MEXICO"] = "墨西哥"; ZH["EQUITY/UK"] = "英国"; ZH["EQUITY/GERMANY"] = "德国";
+ZH["THEME/DATA_CENTERS"] = "数据中心"; ZH["THEME/GRID_ELECTRIFICATION"] = "电网与电气化"; ZH["THEME/CLEAN_ENERGY"] = "清洁能源与光伏";
+ZH["THEME/LITHIUM_BATTERY"] = "锂电"; ZH["THEME/ROBOTICS"] = "机器人"; ZH["THEME/CLOUD"] = "云计算";
+ZH["BOND/US/AGGREGATE"] = "美国综合债"; ZH["BOND/US/TIPS"] = "通胀保值债"; ZH["BOND/US/MUNI"] = "市政债"; ZH["BOND/EM"] = "新兴市场美元债";
+ZH["COMMODITY/AGRICULTURE"] = "农产品"; ZH["EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY/SEMICONDUCTORS/MEMORY"] = "存储 Memory";
+const BOARD = [
+  ["股票大盘", ["EQUITY/US", "EQUITY/US/BROAD/SP500", "EQUITY/US/BROAD/NASDAQ100", "EQUITY/US/BROAD/SP500_EQUAL", "EQUITY/US/BROAD/SMALL_CAP"]],
+  ["半导体与 AI 链", ["EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY", "EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY/SEMICONDUCTORS",
+    "EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY/SEMICONDUCTORS/MEMORY", "EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY/SEMICONDUCTORS/EQUIPMENT",
+    "EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY/SOFTWARE", "THEME/DATA_CENTERS", "THEME/GRID_ELECTRIFICATION", "THEME/URANIUM_NUCLEAR"]],
+  ["周期行业", ["EQUITY/US/SECTOR/ENERGY", "EQUITY/US/SECTOR/ENERGY/OIL_GAS_EP", "EQUITY/US/SECTOR/ENERGY/OIL_SERVICES",
+    "EQUITY/US/SECTOR/MATERIALS/METALS_MINING", "EQUITY/GLOBAL/SECTOR/MATERIALS/COPPER_MINERS", "EQUITY/US/SECTOR/CONSUMER_DISCRETIONARY/HOMEBUILDERS",
+    "EQUITY/US/SECTOR/INDUSTRIALS/TRANSPORTATION", "EQUITY/US/SECTOR/FINANCIALS", "EQUITY/US/SECTOR/FINANCIALS/BANKS/REGIONAL_BANKS"]],
+  ["防御与医疗", ["EQUITY/US/SECTOR/HEALTH_CARE", "EQUITY/US/SECTOR/HEALTH_CARE/BIOTECHNOLOGY", "EQUITY/US/SECTOR/CONSUMER_STAPLES", "EQUITY/US/SECTOR/UTILITIES"]],
+  ["避险与商品", ["PRECIOUS_METALS/GOLD", "EQUITY/GLOBAL/SECTOR/MATERIALS/GOLD_MINERS", "PRECIOUS_METALS/SILVER", "BOND/US/TREASURY/LONG",
+    "BOND/US/CREDIT/HIGH_YIELD", "COMMODITY/ENERGY/CRUDE_OIL", "COMMODITY/INDUSTRIAL_METALS/COPPER"]],
+  ["海外与加密", ["EQUITY/HONG_KONG", "EQUITY/CHINA", "THEME/CHINA_INTERNET", "EQUITY/JAPAN", "EQUITY/KOREA", "EQUITY/TAIWAN", "CRYPTO/BITCOIN"]],
+];
+
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const zh = id => ZH[id] || N[id]?.name || id;
+const en = id => N[id]?.name || id;
+const tcol = b => b ? `var(--t${BAND[b][2]})` : "var(--t3)";
+const fmt = (v, d = 0) => v == null ? "—" : Number(v).toFixed(d);
+const sgn = (v, d = 0) => v == null ? "—" : (v > 0 ? "+" : v < 0 ? "−" : "±") + Math.abs(v).toFixed(d);
+const bandOf = v => { if (v == null) return null; for (const b of D.meta.bands) if (v < b.max) return b.code; return "EXTREME_HOT"; };
+const deltaCls = v => v == null || Math.abs(v) < 0.5 ? "" : v > 0 ? "up" : "down";
+const chip = b => b ? `<span class="chip" style="--c:${tcol(b)}"><i></i>${BAND[b][0]}</span>` : `<span class="chip">无读数</span>`;
+const track = v => v == null ? `<div class="track empty"></div>` : `<div class="track"><span class="mk" style="left:${Math.max(0, Math.min(100, v))}%"></span></div>`;
+const trendChip = n => n.trend?.state ? `<span class="chip trend" title="1 年趋势年化 ${sgn(n.trend.ann, 1)}%，R² ${fmt(n.trend.r2, 2)}">${TREND[n.trend.state][1]} ${TREND[n.trend.state][0]}</span>` : "";
+const clsChip = n => n.eligibility ? `<span class="chip cls" title="${n.eligibility.reviewed ? "已人工复核" : "自动建议，待复核"}">${esc(CLS[n.eligibility.final_class] || n.eligibility.final_class)}${n.eligibility.reviewed ? "" : "*"}</span>` : "";
+const confMark = n => n.checklist?.confirmed ? `<span class="conf" title="确认清单满足 ≥3 条且持续 3 日">● 确认${n.checklist.confirmed === "HOT" ? "过热" : "过冷"}</span>` : "";
+
+function spark(vals, w = 90, h = 26) {
+  const v = vals.map((x, i) => [i, x]).filter(p => p[1] != null);
+  if (v.length < 2) return "";
+  const n = vals.length - 1, x = i => i / n * (w - 4) + 2, y = t => h - 3 - t / 100 * (h - 6);
+  const d = v.map((p, k) => (k ? "L" : "M") + x(p[0]).toFixed(1) + " " + y(p[1]).toFixed(1)).join("");
+  const last = v[v.length - 1];
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+    <line x1="0" x2="${w}" y1="${y(50)}" y2="${y(50)}" stroke="var(--line)" stroke-dasharray="2 3"/>
+    <path d="${d}" fill="none" stroke="var(--ink-2)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+    <circle cx="${x(last[0])}" cy="${y(last[1])}" r="2.6" fill="${tcol(bandOf(last[1]))}" stroke="var(--surface)" stroke-width="1"/></svg>`;
+}
+
+let view = "overview", current = null, histRange = 126, rotK = 5, histMode = "v2", poolBucket = "ALL", resCls = "ALL";
+function go(v, node) {
+  view = v; current = node || null;
+  document.querySelectorAll("#nav button").forEach(b => b.setAttribute("aria-current", String(b.dataset.view === v)));
+  render(); window.scrollTo({ top: 0 });
+}
+document.getElementById("nav").addEventListener("click", e => { const b = e.target.closest("button"); if (b) go(b.dataset.view); });
+app.addEventListener("click", e => {
+  const t = e.target.closest("[data-node]"); if (t && !t.classList.contains("disabled")) { go("node", t.dataset.node); return; }
+  const r = e.target.closest("[data-range]"); if (r) { histRange = +r.dataset.range; render(); return; }
+  const k = e.target.closest("[data-rotk]"); if (k) { rotK = +k.dataset.rotk; render(); return; }
+  const hm = e.target.closest("[data-hmode]"); if (hm) { histMode = hm.dataset.hmode; render(); return; }
+  const pb = e.target.closest("[data-pool]"); if (pb) { poolBucket = pb.dataset.pool; render(); return; }
+  const rc = e.target.closest("[data-rcls]"); if (rc) { resCls = rc.dataset.rcls; render(); }
+});
+document.getElementById("asof").textContent = `数据截至 ${D.meta.asof} · ${D.meta.mode === "DEMO" ? "演示数据" : D.meta.source}`;
+const demoBanner = () => D.meta.mode !== "DEMO" ? "" : `<div class="demo" role="note"><b>演示数据</b>：本页数字由模拟行情生成，用来展示温度引擎和页面功能，<b>不代表真实市场</b>。</div>`;
+
+function row(id) {
+  const n = N[id]; if (!n) return "";
+  const nc = n.temp == null;
+  return `<button class="row${nc ? " disabled" : ""}" data-node="${esc(id)}" ${nc ? 'aria-disabled="true"' : ""}>
+    <span class="nm"><b>${esc(zh(id))}</b><span>${n.trend?.state ? `${TREND[n.trend.state][1]} ${TREND[n.trend.state][0]} · ` : ""}${esc(CLS[n.eligibility?.final_class] || en(id))}${confMark(n) ? " · " : ""}${n.checklist?.confirmed ? `<em class="conf-t">确认${n.checklist.confirmed === "HOT" ? "过热" : "过冷"}</em>` : ""}</span></span>
+    <span class="trk">${track(n.temp)}</span>
+    ${nc ? `<span class="t na">无覆盖</span>` : `<span class="t num">${fmt(n.temp)}</span>`}
+    <span class="delta num ${deltaCls(n.d5)}" title="5 日变化">${nc ? "" : sgn(n.d5)}</span>
+    <span class="spark">${n.hist ? spark(n.hist.slice(-63)) : ""}</span>
+  </button>`;
+}
+
+function quadrant(ids) {
+  const pts = ids.map(id => [id, N[id]]).filter(([, n]) => n?.temp != null && n.trend?.ann != null);
+  const W = 720, H = 360, l = 44, r = 16, t = 16, b = 34, iw = W - l - r, ih = H - t - b, X = 60;
+  const x = v => l + (Math.max(-X, Math.min(X, v)) + X) / (2 * X) * iw, y = v => t + (1 - v / 100) * ih;
+  let s = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:560px;height:auto" role="img" aria-label="趋势与温度四象限">`;
+  s += `<rect x="${x(0)}" y="${y(100)}" width="${x(X) - x(0)}" height="${y(80) - y(100)}" fill="var(--t5)" opacity=".08"/>
+        <rect x="${x(-X)}" y="${y(20)}" width="${x(0) - x(-X)}" height="${y(0) - y(20)}" fill="var(--t1)" opacity=".08"/>`;
+  for (const g of [0, 20, 50, 80, 100]) s += `<line x1="${l}" x2="${W - r}" y1="${y(g)}" y2="${y(g)}" stroke="var(--line)"/><text x="${l - 6}" y="${y(g) + 3}" text-anchor="end">${g}°</text>`;
+  for (const g of [-60, -30, 0, 30, 60]) s += `<line x1="${x(g)}" x2="${x(g)}" y1="${t}" y2="${t + ih}" stroke="var(--line)" ${g === 0 ? "" : 'stroke-dasharray="2 3"'}/><text x="${x(g)}" y="${H - 14}" text-anchor="middle">${g > 0 ? "+" : ""}${g}%</text>`;
+  s += `<text x="${W - r}" y="${H - 2}" text-anchor="end">1 年趋势（年化）→</text>
+        <text x="${x(X) - 6}" y="${y(100) + 14}" text-anchor="end" class="ql">过热</text><text x="${x(X) - 6}" y="${y(50) - 6}" text-anchor="end" class="ql">健康上涨</text>
+        <text x="${x(-X) + 6}" y="${y(0) - 8}" class="ql">超卖</text><text x="${x(-X) + 6}" y="${y(50) - 6}" class="ql">阴跌</text>`;
+  // Label only the readings that matter (extremes, strong trends); the rest stay on hover.
+  const placed = [];
+  const notable = n => n.temp >= 80 || n.temp <= 20 || Math.abs(n.trend.ann) >= 30 || n.checklist?.confirmed;
+  for (const [id, n] of pts) {
+    const cx = x(n.trend.ann), cy = y(n.temp), right = cx > W - 140;
+    let label = "";
+    if (notable(n) && !placed.some(([px, py]) => Math.abs(px - cx) < 70 && Math.abs(py - cy) < 13)) {
+      placed.push([cx, cy]);
+      label = `<text x="${right ? cx - 9 : cx + 9}" y="${cy + 4}" text-anchor="${right ? "end" : "start"}" class="qn">${esc(zh(id))}</text>`;
+    }
+    s += `<g data-node="${esc(id)}" style="cursor:pointer"><circle cx="${cx}" cy="${cy}" r="6" fill="${tcol(n.band)}" stroke="var(--surface)" stroke-width="2"/>
+      ${label}<title>${esc(zh(id))}：温度 ${fmt(n.temp)}°，趋势 ${sgn(n.trend.ann, 1)}%</title></g>`;
+  }
+  return s + "</svg>";
+}
+
+function overview() {
+  const us = N["EQUITY/US"], r = D.risk;
+  const rb = r.score == null ? null : r.score >= 60 ? "Risk-on 偏向" : r.score <= 40 ? "Risk-off 偏向" : "中性";
+  const all = Object.entries(N).filter(([, n]) => n.temp != null && n.mode === "DIRECTIONAL");
+  const conf = all.filter(([, n]) => n.checklist?.confirmed);
+  const warm = all.filter(([, n]) => n.d5 != null).sort((a, b) => b[1].d5 - a[1].d5);
+  return demoBanner() + `
+  <section class="hero">
+    <div class="panel">
+      <div class="eyebrow">美股温度 · US Equity</div>
+      <div class="reading" style="margin-top:6px">
+        <div class="big num">${fmt(us.temp)}<sup>°</sup></div>
+        <div class="reading-meta"><div class="facts" style="margin:0">${chip(us.band)}${trendChip(us)}</div>
+          <span class="delta num ${deltaCls(us.d5)}">5 日 ${sgn(us.d5)} · 20 日 ${sgn(us.d20)}</span>
+          <span class="muted" style="font-size:12px">短期温度 ${fmt(us.temp_short)} · 广度 ${fmt(us.sub?.above50)}% 站上 50 日线</span></div>
+      </div>
+      <div style="margin-top:14px">${track(us.temp)}</div>
+      <div class="hero-spark" title="近一年温度">${spark(us.hist, 600, 56)}</div>
+      <p class="hero-note">${conf.length ? `确认信号：${conf.map(([id, n]) => `<b>${esc(zh(id))}</b> ${n.checklist.confirmed === "HOT" ? "过热" : "过冷"}`).join("，")}。` : "目前没有节点满足极端确认条件。"}
+      升温最快：${warm.slice(0, 3).map(([id, n]) => `<b>${esc(zh(id))}</b> ${sgn(n.d5)}`).join("，")}；降温最快：${warm.slice(-3).reverse().map(([id, n]) => `<b>${esc(zh(id))}</b> ${sgn(n.d5)}`).join("，")}（5 个交易日）。</p>
+    </div>
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap">
+        <div class="eyebrow">风险偏好 · Risk Appetite</div><span class="signal-tag" title="解读层：基于相对强弱的解释，不是温度本身">解读层</span></div>
+      <div class="reading" style="margin-top:6px"><div class="big num" style="font-size:56px">${fmt(r.score)}</div>
+        <div class="reading-meta"><span class="chip">${rb ?? "—"}</span><span class="delta num ${deltaCls(r.d5)}">5 日 ${sgn(r.d5)}</span></div></div>
+      <div class="gauge-row">${r.components.map(c => `<span class="lbl" title="${esc(c.meaning)}">${esc(c.label)}</span>
+        <div class="minibar" title="${esc(c.pair)} ${fmt(c.value)}"><b style="width:${c.value ?? 0}%;background:${tcol(bandOf(c.value))}"></b></div>`).join("")}</div>
+    </div>
+  </section>
+  <section class="sec">
+    <div class="sec-h"><h2>温度板</h2><span class="muted">温度 = 相对自身趋势的冷热，自身 5 年百分位 · 副标题 = 趋势状态 · 周期资格（* 待复核）</span></div>
+    <div class="board">${BOARD.map(([title, ids]) => `<div class="group"><h3>${title}</h3>${ids.map(row).join("")}</div>`).join("")}</div>
+    <div class="legend">${D.meta.bands.map((b, i) => `<span class="chip" style="--c:var(--t${i})"><i></i>${BAND[b.code][0]} ${i ? D.meta.bands[i - 1].max : 0}–${Math.min(b.max, 100)}</span>`).join("")}</div>
+  </section>
+  <section class="sec"><div class="sec-h"><h2>趋势 × 温度</h2><span class="muted">悬停看每个点 · 右上 = 强趋势且过热；右中 = 健康上涨；左下 = 下跌且超卖；左中 = 阴跌（警惕价值陷阱）</span></div>
+    <div class="panel chart-box">${quadrant(BOARD.flatMap(([, ids]) => ids))}</div></section>`;
+}
+
+function rotation() {
+  const key = rotK === 5 ? "d5" : "d20";
+  const rows = Object.entries(N).filter(([, n]) => n.temp != null && n.mode === "DIRECTIONAL" && n[key] != null).sort((a, b) => b[1][key] - a[1][key]);
+  const W = 760, rh = 22, top = 26, L = 170, R = W - 20, H = top + rows.length * rh + 10;
+  const x = v => L + v / 100 * (R - L);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:600px;height:auto" role="img" aria-label="各节点 ${rotK} 日温度变化">`;
+  for (const t of [0, 25, 50, 75, 100]) svg += `<line class="ax" x1="${x(t)}" x2="${x(t)}" y1="${top - 6}" y2="${H - 6}"/><text x="${x(t)}" y="${top - 10}" text-anchor="middle">${t}</text>`;
+  rows.forEach(([id, n], i) => {
+    const y = top + i * rh + rh / 2, from = n.temp - n[key], to = n.temp;
+    svg += `<g data-node="${esc(id)}" style="cursor:pointer"><rect x="0" y="${y - rh / 2}" width="${W}" height="${rh}" fill="transparent"/>
+      <text x="${L - 10}" y="${y + 4}" text-anchor="end">${esc(zh(id))}</text>
+      <line x1="${x(from)}" x2="${x(to)}" y1="${y}" y2="${y}" stroke="var(--ink-3)" stroke-width="2"/>
+      <circle cx="${x(from)}" cy="${y}" r="3.5" fill="var(--surface)" stroke="var(--ink-3)" stroke-width="1.5"/>
+      <circle cx="${x(to)}" cy="${y}" r="5" fill="${tcol(n.band)}" stroke="var(--surface)" stroke-width="2"/>
+      <text x="${Math.max(x(from), x(to)) + 10}" y="${y + 4}" style="font-family:var(--f-mono)">${sgn(n[key])}</text>
+      <title>${esc(zh(id))}: ${fmt(from)} → ${fmt(to)}</title></g>`;
+  });
+  svg += "</svg>";
+  const HEAT = BOARD.flatMap(([, ids]) => ids).filter(id => N[id]?.hist);
+  const C = 60, hd = D.dates.slice(-C);
+  const heat = `<div class="heat" style="--cols:${C}">${HEAT.map(id => {
+    const h = N[id].hist.slice(-C);
+    return `<div class="hr"><button class="hl" data-node="${esc(id)}">${esc(zh(id))}</button>${h.map((v, i) =>
+      `<span class="hc" style="background:${v == null ? "var(--surface-2)" : tcol(bandOf(v))}" title="${esc(zh(id))} ${hd[i]}: ${fmt(v)}°"></span>`).join("")}<span class="hv num">${fmt(N[id].temp)}</span></div>`;
+  }).join("")}<div class="hr"><span></span>${hd.map((d, i) => `<span class="hx">${i % 20 === 0 ? d.slice(5) : ""}</span>`).join("")}<span></span></div></div>`;
+  const chain = ["EQUITY/GLOBAL", "EQUITY/US", "EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY", "EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY/SEMICONDUCTORS", "EQUITY/US/SECTOR/INFORMATION_TECHNOLOGY/SEMICONDUCTORS/MEMORY"];
+  return demoBanner() + `
+  <section class="sec"><div class="sec-h"><h2>轮动热力图</h2><span class="muted">近 ${C} 个交易日每天的温度区间 · 悬停看数值</span></div>
+    <div class="panel chart-box">${heat}</div></section>
+  <section class="sec"><div class="sec-h"><h2>风险偏好链</h2><span class="muted">每一级相对上一级的强弱偏离（RS）· &gt;60 说明资金在向这一级集中</span></div>
+    <div class="chain">${chain.filter(id => N[id]).map((id, i) => `${i ? '<span class="arrow">→</span>' : ""}<button class="lnk" data-node="${id}">
+      <div class="eyebrow">${esc(zh(id))}</div><div style="display:flex;gap:10px;align-items:baseline;margin-top:4px"><b class="num">${fmt(N[id].temp)}°</b>
+      <span class="muted" style="font-size:12px">RS ${fmt(N[id].factors?.rs)}</span></div></button>`).join("")}</div></section>
+  <section class="sec"><div class="sec-h"><h2>温度变化</h2>
+    <div class="seg" role="group" aria-label="时间窗口"><button data-rotk="5" aria-pressed="${rotK === 5}">5 日</button><button data-rotk="20" aria-pressed="${rotK === 20}">20 日</button></div>
+    <span class="muted">空心点 = ${rotK} 日前，实心点 = 今天</span></div>
+    <div class="panel chart-box">${svg}</div></section>`;
+}
+
+function tree() {
+  const order = ["EQUITY", "THEME", "BOND", "PRECIOUS_METALS", "COMMODITY", "CRYPTO", "CURRENCY", "VOLATILITY", "REAL_ESTATE", "CASH_LIKE"];
+  const ids = Object.keys(N).filter(id => id !== "MARKET").sort((a, b) => order.indexOf(a.split("/")[0]) - order.indexOf(b.split("/")[0]) || a.localeCompare(b));
+  return demoBanner() + `<section class="sec"><div class="sec-h"><h2>市场树</h2><span class="muted">${D.meta.n_nodes} 个节点 · ${D.meta.n_families} 个 Family · 候选 ${D.meta.n_etfs} 只 ETF，参与计算 ${D.meta.n_selected ?? "—"} 只</span></div>
+  <div class="tree">${ids.map(id => {
+    const n = N[id], depth = id.split("/").length - 1, dim = !n.scored;
+    const label = n.alias_of ? `${zh(id)} → 见 ${zh(n.alias_of)}` : zh(id);
+    const right = n.scored && n.temp == null ? `<span class="muted" style="font-size:12px">无覆盖</span>` : "";
+    return `<button class="trow${dim ? " dim" : ""}" ${dim ? "tabindex=-1" : `data-node="${esc(id)}"`} style="padding-left:${16 + depth * 18}px">
+      <span class="nm">${esc(label)}${dim ? "" : ` <span class="muted mono">${n.trend?.state ? TREND[n.trend.state][1] + " " : ""}${esc(CLS[n.eligibility?.final_class] || "")}</span>`}</span>
+      <span class="trk">${dim ? "" : track(n.temp)}</span>
+      <span class="t num">${n.temp == null ? right : fmt(n.temp)}</span>
+      <span class="delta num ${deltaCls(n.d5)}">${n.temp == null ? "" : sgn(n.d5)}</span></button>`;
+  }).join("")}</div></section>`;
+}
+
+function histChart(id) {
+  const n = N[id], src = histMode === "short" && n.hist_short ? n.hist_short : n.hist;
+  const vals = src.slice(-histRange), dates = D.dates.slice(-histRange);
+  const W = 640, H = 240, l = 30, r = 10, t = 10, b = 24, iw = W - l - r, ih = H - t - b;
+  const x = i => l + i / (vals.length - 1) * iw, y = v => t + (1 - v / 100) * ih;
+  let s = `<svg class="histsvg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${esc(zh(id))} 温度历史">`;
+  const edges = [0, ...D.meta.bands.map(b => Math.min(b.max, 100))];
+  D.meta.bands.forEach((bd, i) => s += `<rect x="${l}" width="${iw}" y="${y(edges[i + 1])}" height="${y(edges[i]) - y(edges[i + 1])}" fill="var(--t${i})" opacity=".09"/>`);
+  for (const g of edges) s += `<line x1="${l}" x2="${W - r}" y1="${y(g)}" y2="${y(g)}" stroke="var(--line)"/><text x="${l - 6}" y="${y(g) + 3}" text-anchor="end">${g}</text>`;
+  for (let k = 0; k <= 4; k++) { const i = Math.round(k / 4 * (vals.length - 1)); s += `<text x="${x(i)}" y="${H - 6}" text-anchor="${k === 0 ? "start" : k === 4 ? "end" : "middle"}">${dates[i].slice(2)}</text>`; }
+  let d = "", pen = false;
+  vals.forEach((v, i) => { if (v == null) { pen = false; return; } d += (pen ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1); pen = true; });
+  s += `<path d="${d}" fill="none" stroke="var(--ink)" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>`;
+  const li = vals.length - 1;
+  if (vals[li] != null) s += `<circle cx="${x(li)}" cy="${y(vals[li])}" r="4" fill="${tcol(bandOf(vals[li]))}" stroke="var(--surface)" stroke-width="2"/>`;
+  s += `<line id="hx" x1="0" x2="0" y1="${t}" y2="${t + ih}" stroke="var(--ink-3)" stroke-dasharray="3 3" visibility="hidden"/><rect x="${l}" y="${t}" width="${iw}" height="${ih}" fill="transparent"/></svg>`;
+  return { svg: s, vals, dates, l, iw, W };
+}
+function attachHist(h) {
+  const box = document.getElementById("histbox"); if (!box) return;
+  const svg = box.querySelector("svg"), tip = document.getElementById("htip"), hx = svg.querySelector("#hx");
+  svg.addEventListener("pointermove", ev => {
+    const rect = svg.getBoundingClientRect(), px = (ev.clientX - rect.left) / rect.width * h.W;
+    const i = Math.max(0, Math.min(h.vals.length - 1, Math.round((px - h.l) / h.iw * (h.vals.length - 1))));
+    const v = h.vals[i]; if (v == null) { tip.hidden = true; return; }
+    const sx = h.l + i / (h.vals.length - 1) * h.iw;
+    hx.setAttribute("x1", sx); hx.setAttribute("x2", sx); hx.setAttribute("visibility", "visible");
+    tip.hidden = false; tip.innerHTML = `<span class="mono">${h.dates[i]}</span><br><b class="num">${fmt(v)}°</b> ${BAND[bandOf(v)][0]}`;
+    tip.style.left = Math.min(rect.width - 110, Math.max(0, sx / h.W * rect.width + 10)) + "px"; tip.style.top = "8px";
+  });
+  svg.addEventListener("pointerleave", () => { tip.hidden = true; hx.setAttribute("visibility", "hidden"); });
+}
+
+const dv = v => v == null ? "—" : v >= 1000 ? (v / 1000).toFixed(1) + "B" : v.toFixed(0) + "M";
+function etfRows(fid) {
+  const f = F[fid]; if (!f) return "";
+  const members = f.members.filter(t => E[t]);
+  if (!members.length) return "";
+  const head = `<tr class="fam"><td colspan="9">${esc(f.name)} <span class="muted mono">${esc(fid)}</span><br><span class="muted" style="font-weight:400">${f.identity_basis === "SINGLE_STOCK" ? `单股杠杆，标的 ${esc(f.underlying_stock)}` : `指数：${esc(f.benchmark ?? "无（主动管理）")}`} · ${esc(f.identity_basis)}${f.sentiment_only && f.price_proxy_family ? ` · 只提供多空情绪，价格取 ${esc(f.price_proxy_family)}` : ""}${f.backfill ? ` · 上市前按持仓回填：${Object.entries(f.backfill).map(([k, w]) => `${esc(k)} ${Math.round(w * 100)}%`).join("、")}` : ""}${f.note ? " · " + esc(f.note) : ""}</span></td></tr>`;
+  return head + members.map(t => {
+    const e = E[t], c = e.check;
+    const ver = e.verified ? `<span class="ok">已人工核验</span>` : c ? (c.pass ? `<span class="ok">自动校验通过</span> <span class="muted mono">β ${c.beta} R² ${c.r2}</span>` : `<span class="warn">校验未过，不计入</span> <span class="muted mono">β ${c.beta ?? "—"} R² ${c.r2 ?? "—"}</span>`) : `<span class="muted">未核验</span>`;
+    return `<tr><td><b class="mono" style="font-size:13px">${t}</b><br><span class="muted" style="font-size:11px">${esc(e.issuer)}</span></td>
+      <td><span class="role">${ROLE[e.role] || e.role}</span></td><td class="r num">${e.direction === "SHORT" ? "−" : "+"}${e.leverage}×</td>
+      <td class="r num">${fmt(e.r5, 1)}%</td><td class="r num">${fmt(e.r20, 1)}%</td><td class="r num">${dv(e.adv)}</td>
+      <td class="muted" style="font-size:11.5px">${esc(BUCKET[e.bucket] || e.bucket)} #${e.rank}<br>${esc(REASON[e.reason] || "")}</td><td class="muted mono" style="font-size:11px">${esc(e.since || "")}</td><td>${ver}</td></tr>`;
+  }).join("");
+}
+
+function nodeView(id) {
+  const n = N[id];
+  const parts = id.split("/"), crumbs = parts.map((_, i) => parts.slice(0, i + 1).join("/")).filter(c => N[c]);
+  const kids = Object.keys(N).filter(c => (N[c].parent === id || (N[c].parent && !N[N[c].parent].scored && N[N[c].parent].parent === id)) && N[c].scored);
+  const levFams = Object.keys(F).filter(f => F[f].node === id && F[f].members.some(t => E[t] && ["LEVERAGED_BULL", "LEVERAGED_BEAR", "INVERSE"].includes(E[t].role)));
+  const fids = [...new Set([...(n.families || []), ...(n.anchor_family ? [n.anchor_family] : [])])].filter(f => F[f]?.members.some(t => E[t]));
+  const stocks = Object.entries(S).filter(([, s]) => s.node === id || s.node.startsWith(id + "/"));
+  if (n.temp == null) return demoBanner() + `<nav class="crumbs">${crumbs.map((c, i) => `${i ? "<span>›</span>" : ""}<button data-node="${esc(c)}">${esc(zh(c))}</button>`).join("")}</nav>
+    <div class="detail-head"><div><h1>${esc(zh(id))}</h1><div class="muted mono">${esc(id)}</div></div></div><div class="panel" style="margin-top:16px">${esc(n.note || "该节点暂无可用的 ETF 读数。")}</div>`;
+  const h = histChart(id);
+  const SUBS = { stretch: [["z252", "1 年偏离 z", 2], ["rsi_w", "周线 RSI", 0]], accel: [["acc20", "20 日加速 z", 2]],
+    crowding: [["activity", "成交活跃度", 0], ["volume_dir", "带方向成交", 0]], breadth: [["above50", "站上 50 日线 %", 0], ["hl_net", "新高−新低", 0]], rs: [["rs_z", "比价偏离 z", 2]] };
+  const why = { breadth: "样本不足 5 个（子板块 ETF + 所属大市值股）。", rs: "该节点没有设定相对强弱基准。", crowding: "缺少成交额数据。" };
+  const factorHtml = FACT.map(([k, name, desc]) => {
+    const v = n.factors?.[k], w = D.meta.weights?.[k];
+    const subs = (SUBS[k] || []).filter(([s]) => n.sub?.[s] != null).map(([s, lb, d]) => `${lb} <em>${fmt(n.sub[s], d)}</em>`);
+    return `<div class="factor${v == null ? " na" : ""}"><div class="fn"><b>${name}${w ? ` <span class="muted mono" style="font-weight:400">${Math.round(w * 100)}%</span>` : ""}</b><span>${desc}</span></div>
+      <div class="bar">${v == null ? "" : `<b style="width:${v}%;background:${tcol(bandOf(v))}"></b>`}</div>
+      <div class="v num">${v == null ? "—" : fmt(v)}</div>${subs.length || v == null ? `<div class="sub">${v == null ? esc(why[k] || "数据不足。") : subs.join("")}</div>` : ""}</div>`;
+  }).join("");
+  const el = n.eligibility, st = n.band_stats || {}, act = n.action;
+  const bkey = { EXTREME_COLD: "EXTREME_COLD", COLD: "COLD", HOT: "HOT", EXTREME_HOT: "EXTREME_HOT" }[n.band];
+  const statRow = k => { const s = st[k]; if (!s) return ""; return `<tr${k === bkey ? ' class="cur"' : ""}><td>${BAND[k][0]}</td><td class="r num">${s.episodes}</td><td class="r num">${sgn(s.med60, 1)}%</td><td class="r num">${sgn(s.med120, 1)}%</td><td class="r num">${sgn(s.worst120, 1)}%</td><td class="r num">${sgn(s.best120, 1)}%</td></tr>`; };
+  const actPanel = `<div class="panel action">
+    <div class="eyebrow">参考动作 · 解读层</div>
+    <div class="act-row"><b class="act">${esc(ACT[act] || act || "—")}</b><span class="muted">${esc(CLS[el.final_class] || "")}${el.reviewed ? "（已复核）" : "（自动建议，待复核）"} · ${BAND[n.band][0]}${n.checklist?.confirmed ? " · 已确认" : ""}</span></div>
+    <div class="tbl-wrap"><table><thead><tr><th>历史上进入</th><th class="r">次数</th><th class="r">60 日中位</th><th class="r">120 日中位</th><th class="r">120 日最差</th><th class="r">120 日最好</th></tr></thead>
+      <tbody>${["EXTREME_COLD", "COLD", "HOT", "EXTREME_HOT"].map(statRow).join("")}</tbody></table></div>
+    <p class="muted" style="font-size:12px;margin:8px 0 0">按该节点自身历史统计（同一区间两次进入至少间隔 60 日）。参考动作是历史描述，不是投资建议。周期型：极热且确认 → 参考减仓；结构成长/宽基：热只提示不追高；极冷但仍在加速下跌 → 等待企稳；结构衰退/工具型/宏观资产不给布局参考。</p></div>`;
+  const ck = n.checklist;
+  const ckPanel = `<div class="panel"><div class="sec-h"><h2>极端确认清单</h2><span class="muted">≥3 条且持续 3 日才算确认 · 过热 ${ck.hot_count}/6 · 过冷 ${ck.cold_count}/6</span></div>
+    <div class="ck">${ck.items.map(i => `<div class="ck-i"><span>${esc(i.name)}</span><span class="num mono">${fmt(i.value, 1)}</span>
+      <span class="${i.hot ? "hot" : i.cold ? "cold" : "muted"}">${i.value == null ? "无数据" : i.hot ? "✓ 过热" : i.cold ? "✓ 过冷" : "—"}</span><span class="muted mono" style="font-size:11px">≥${i.hot_at ?? "—"} / ≤${i.cold_at ?? "—"}</span></div>`).join("")}</div></div>`;
+  const levPanel = Object.keys(n.lev || {}).length ? `<div class="panel"><div class="sec-h"><h2>杠杆块</h2><span class="muted">杠杆与反向 ETF 单独计算 · 按 20 日成交额折算敞口</span></div>
+    <div class="ck">${Object.entries(n.lev).map(([g, v]) => `<div class="ck-i"><span>${g === "single" ? "单股杠杆" : "指数/行业杠杆"}</span>
+      <span class="num mono">${fmt(v.score)}</span><span class="muted">多头活跃 ${fmt(v.spec)} · 空头活跃 ${fmt(v.hedge)}</span><span class="muted mono" style="font-size:11px">${v.share_raw != null ? `多头占比 ${fmt(v.share_raw * 100)}%` : "单边"}</span></div>`).join("")}</div></div>` : "";
+  const elPanel = `<div class="panel"><div class="sec-h"><h2>周期资格</h2><span class="muted">${el.reviewed ? `已复核：${esc(el.review_reason || "")}` : `自动建议：${esc(CLS[el.auto_class] || el.auto_class)}，待你复核（data/eligibility.yaml）`}</span></div>
+    <div class="ck">${Object.entries(el.tests).map(([k, t]) => {
+      let v = t.value; if (k === "T3" && v) v = `冷 ${v.cold_n} 次 ${sgn(v.cold_med120, 1)}% · 热 ${v.hot_n} 次 ${sgn(v.hot_med120, 1)}%`; else if (k === "T1" && v != null) v = `${sgn(v, 1)}%/年`; else if (k === "T4" && v != null) v = `${sgn(v, 1)}%/年`;
+      return `<div class="ck-i"><span>${k} ${esc(t.label)}</span><span class="mono" style="font-size:11.5px">${esc(v ?? "")}</span><span class="${t.pass ? "ok" : "warn"}">${t.pass ? "通过" : "未通过"}</span><span></span></div>`; }).join("")}</div></div>`;
+  return demoBanner() + `
+  <nav class="crumbs" aria-label="层级">${crumbs.map((c, i) => `${i ? "<span>›</span>" : ""}<button data-node="${esc(c)}">${esc(zh(c))}</button>`).join("")}</nav>
+  <div class="detail-head"><div><h1>${esc(zh(id))}</h1><div class="muted mono" style="overflow-wrap:anywhere">${esc(en(id))} · ${esc(id)}</div>
+    <div class="facts">${chip(n.band)}${trendChip(n)}${clsChip(n)}${confMark(n)}<span class="chip">短期温度 ${fmt(n.temp_short)}</span>${n.rs_benchmark ? `<button class="chip" data-node="${esc(n.rs_benchmark)}" style="border:0;cursor:pointer">RS 基准：${esc(zh(n.rs_benchmark))}</button>` : ""}${n.backfilled_until ? `<span class="chip" title="上市前历史由持仓股票合成">${esc(n.backfilled_until)} 前为合成回填</span>` : ""}</div></div>
+    <div class="reading"><div class="big num">${fmt(n.temp)}<sup>°</sup></div>
+      <div class="reading-meta"><span class="delta num ${deltaCls(n.d1)}">1 日 ${sgn(n.d1)}</span><span class="delta num ${deltaCls(n.d5)}">5 日 ${sgn(n.d5)}</span><span class="delta num ${deltaCls(n.d20)}">20 日 ${sgn(n.d20)}</span></div></div></div>
+  ${n.note ? `<p class="muted" style="margin-top:10px">${esc(n.note)}</p>` : ""}
+  ${n.mode === "DIRECTIONAL" ? `<section style="margin-top:18px">${actPanel}</section>` : ""}
+  <section class="two" style="margin-top:16px">
+    <div class="panel"><div class="sec-h"><h2>五个维度</h2><span class="muted">温度 = 加权综合值的自身 5 年百分位</span></div>${factorHtml}</div>
+    <div class="panel"><div class="hist-ctl"><h2 style="font:600 20px var(--f-display)">温度历史</h2>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${n.hist_short ? `<div class="seg" role="group" aria-label="温度类型"><button data-hmode="v2" aria-pressed="${histMode === "v2"}">主温度</button><button data-hmode="short" aria-pressed="${histMode === "short"}">短期</button></div>` : ""}
+      <div class="seg" role="group" aria-label="时间范围">${[[21, "1M"], [63, "3M"], [126, "6M"], [252, "1Y"]].map(([k, l]) => `<button data-range="${k}" aria-pressed="${histRange === k}">${l}</button>`).join("")}</div></div></div>
+      <div class="rel" id="histbox">${h.svg}<div class="tip" id="htip" hidden></div></div>
+      <p class="muted" style="font-size:12px;margin:6px 0 0">色带 = 温度区间，按定义每个区间在自身 5 年里出现的频率固定（极热、极冷各 5%）。</p></div></section>
+  <section class="two" style="margin-top:16px">${ckPanel}${elPanel}</section>
+  ${levPanel ? `<section style="margin-top:16px">${levPanel}</section>` : ""}
+  ${kids.length ? `<section class="sec"><div class="sec-h"><h2>下一级</h2></div><div class="group">${kids.map(row).join("")}</div></section>` : ""}
+  ${stocks.length ? `<section class="sec"><div class="sec-h"><h2>映射的大市值股</h2><span class="muted">只用于广度与回填，不单独打温度</span></div>
+    <div class="stocks">${stocks.map(([t, s]) => `<span class="stk"><b class="mono">${esc(s.name || t)}</b> <span class="num ${s.r20 > 0 ? "up" : s.r20 < 0 ? "down" : ""}">${sgn(s.r20, 1)}%</span> <span class="muted">${s.above50 ? "站上 50 日线" : s.above50 === false ? "低于 50 日线" : ""}</span></span>`).join("")}</div></section>` : ""}
+  ${fids.length || levFams.length ? `<section class="sec"><div class="sec-h"><h2>ETF 映射</h2><span class="muted">同一 Family 内只取核心 ETF 的价格；杠杆/反向只进入杠杆块</span></div>
+    <div class="panel tbl-wrap" style="padding:0"><table><thead><tr><th>ETF</th><th>角色</th><th class="r">杠杆</th><th class="r">5日</th><th class="r">20日</th><th class="r">日均成交额</th><th>流动性排名</th><th>上市</th><th>核验</th></tr></thead>
+    <tbody>${[...new Set([...fids, ...levFams])].map(etfRows).join("")}</tbody></table></div></section>` : ""}`;
+}
+
+function pool() {
+  const rows = (D.pool || []).filter(r => poolBucket === "ALL" || r.bucket === poolBucket);
+  const buckets = Object.keys(BUCKET).filter(b => (D.pool || []).some(r => r.bucket === b));
+  return demoBanner() + `<section class="sec"><div class="sec-h"><h2>ETF 池</h2><span class="muted">候选 ${D.meta.n_etfs} 只 · 参与计算 ${D.meta.n_selected} 只 · 规则：每类按 60 日成交额中位数取 Top ${D.meta.top_n}，另加节点覆盖、配对补全与杠杆块</span></div>
+    <div class="seg wrap" role="group" aria-label="类别"><button data-pool="ALL" aria-pressed="${poolBucket === "ALL"}">全部</button>${buckets.map(b => `<button data-pool="${b}" aria-pressed="${poolBucket === b}">${BUCKET[b]}</button>`).join("")}</div>
+    <div class="panel tbl-wrap" style="padding:0"><table><thead><tr><th>类别</th><th class="r">排名</th><th>ETF</th><th>名称</th><th class="r">日均成交额</th><th>状态</th><th>节点</th></tr></thead><tbody>
+    ${rows.map(r => { const e = E[r.ticker], f = e ? F[e.family] : null; return `<tr${r.selected ? "" : ' class="dimrow"'}><td class="muted">${esc(BUCKET[r.bucket] || r.bucket)}</td><td class="r num">${r.rank}</td><td><b class="mono">${esc(r.ticker)}</b></td><td style="white-space:normal;min-width:180px">${esc(e?.name || "")}</td><td class="r num">${r.available ? dv(r.adv) : "无数据"}</td><td>${r.selected ? `<span class="ok">${esc(REASON[r.reason] || r.reason)}</span>` : `<span class="muted">未入选</span>`}</td><td>${f ? `<button class="linkish" data-node="${esc(f.node)}">${esc(zh(f.node))}</button>` : ""}</td></tr>`; }).join("")}
+    </tbody></table></div></section>`;
+}
+
+function research() {
+  const R = D.research;
+  if (!R?.all) return `<p class="muted" style="margin-top:20px">还没有研究数据。</p>`;
+  const H = R.horizons, rows = resCls === "ALL" ? R.all : R.by_class[resCls] || [];
+  const maxAbs = Math.max(0.5, ...rows.flatMap(b => H.map(h => Math.abs(b["f" + h]?.median ?? 0))));
+  const block = h => `<div class="panel"><div class="sec-h"><h2>之后 ${h} 个交易日</h2><span class="muted">中位数 · 上涨概率 · 样本天数</span></div>
+    ${rows.map(b => { const s = b["f" + h]; const w = s ? Math.abs(s.median) / maxAbs * 50 : 0;
+      return `<div class="rbar"><span class="num mono">${b.lo}–${b.hi}°</span>
+        <div class="z">${s ? `<b style="left:${s.median >= 0 ? 50 : 50 - w}%;width:${w}%;background:${tcol(bandOf((b.lo + b.hi) / 2))}"></b>` : ""}</div>
+        <span class="num" style="text-align:right">${s ? sgn(s.median, 2) + "%" : "样本不足"}</span>
+        <span class="num muted" style="text-align:right">${s ? s.hit + "%" : ""}</span>
+        <span class="num muted mono" style="text-align:right">${s ? s.n.toLocaleString() : b.days}</span></div>`; }).join("")}</div>`;
+  const cls = Object.keys(R.by_class || {});
+  return demoBanner() + `<section class="sec"><div class="sec-h"><h2>温度之后发生了什么</h2><span class="signal-tag">研究层</span></div>
+    <p class="prose" style="margin:0">把 ${R.n_nodes} 个方向型节点在 ${R.start} 至 ${R.end} 的每日主温度按区间分组，统计之后的涨跌。按周期资格分开看：逆向用法只对周期型应当成立。相邻交易日的样本高度重叠，有效样本远少于显示的天数；这是历史描述，不是预测。</p>
+    <div class="seg wrap" role="group" aria-label="周期资格"><button data-rcls="ALL" aria-pressed="${resCls === "ALL"}">全部</button>${cls.map(c => `<button data-rcls="${c}" aria-pressed="${resCls === c}">${esc(CLS[c] || c)}</button>`).join("")}</div></section>
+  <section class="research-grid" style="margin-top:16px">${H.map(block).join("")}</section>`;
+}
+
+function method() {
+  return `<section class="sec prose"><div class="sec-h"><h2>温度怎么来的</h2></div>
+  <p><b>温度看的是“离自己的趋势有多远”，不是“价格有多高”。</b>每个节点先用过去 6 个月和 1 年的对数价格回归画出趋势线。一只稳定上涨的 ETF 贴着自己的趋势线走，温度在中性附近，趋势状态显示“强上升”；只有涨得明显快于自己的趋势（加速冲顶）才会变热，跌穿趋势才会变冷。</p>
+  <p>五个维度：偏离趋势（${Math.round((D.meta.weights?.stretch ?? .3) * 100)}%）、动量加速（${Math.round((D.meta.weights?.accel ?? .2) * 100)}%）、拥挤度（${Math.round((D.meta.weights?.crowding ?? .2) * 100)}%，含带方向的成交额和杠杆块）、广度（${Math.round((D.meta.weights?.breadth ?? .15) * 100)}%）、相对强弱偏离（${Math.round((D.meta.weights?.rs ?? .15) * 100)}%）。每个子指标先和自己过去 5 年比，再合成；温度 = 合成值在自身 5 年里的百分位，取 3 日平均。所以 95° 的意思是“比自己过去 5 年 95% 的日子都热”，对任何资产都一样。</p>
+  <h3>极端要确认</h3><p>进入极热（≥95）或极冷（≤5）时，检查 6 条：偏离趋势、周线 RSI、动量加速、带方向成交额、杠杆情绪、广度。满足 3 条以上且持续 3 个交易日才标记“确认”。</p>
+  <h3>周期资格</h3><p>冷热只对周期性、长期存在的行业有逆向参考价值。每个节点自动做 5 项检验：长期回报为正、有过大跌后收复的周期、自身历史上“冷之后好过热之后”、没有长期跑输上级、不是期货或波动率工具。自动结论带 *，需要你在 <code>data/eligibility.yaml</code> 里复核确认。</p>
+  <h3>选哪些 ETF</h3><p>候选池 ${D.meta.n_etfs} 只美股上市 ETF，按类别（宽基、行业、细分行业、主题、杠杆、单股杠杆、债券、商品、国际、加密）用 60 日成交额中位数排名，每类取 Top ${D.meta.top_n}；另外保证每个节点保留流动性最好的核心 ETF，并把节点上成交额 ≥500 万美元的杠杆/反向 ETF 纳入杠杆块。今天参与计算 ${D.meta.n_selected} 只。约 ${D.meta.n_stocks} 只大市值股只用于广度和上市前回填，不单独显示。</p>
+  <h3>同一个指数只算一次</h3><p>SOXX、SOXL、SOXS 跟踪同一个半导体指数，价格只取核心 ETF；杠杆与反向 ETF（包括 NVDL 这类单股杠杆）只进入杠杆块，按标的映射到节点。正股按行业归属进入广度。</p>
+  <h3>元数据核验</h3><p>${D.meta.n_verified}/${D.meta.n_etfs} 只已对照基金官网人工核验。杠杆与反向 ETF 只有在日收益对标的的回归 β 接近目标倍数（±15%）且 R² ≥ 0.85 时才计入。</p>
+  <h3>温度不是信号</h3><p>温度描述市场状态；参考动作与风险偏好属于解读层，是历史统计的描述，不是投资建议。</p>
+  <p class="muted">模式：${D.meta.mode === "DEMO" ? "演示（模拟行情）" : "真实 EOD 行情"} · 来源：${esc(D.meta.source)} · 截至 ${D.meta.asof} · 生成于 ${D.meta.generated_at}${D.meta.missing?.length ? ` · 未取到数据：${esc(D.meta.missing.join("、"))}` : ""}</p>
+  </section>`;
+}
+
+function render() {
+  let h;
+  if (view === "node" && current && N[current]) h = nodeView(current);
+  else if (view === "rotation") h = rotation();
+  else if (view === "tree") h = tree();
+  else if (view === "pool") h = pool();
+  else if (view === "research") h = research();
+  else if (view === "method") h = method();
+  else h = overview();
+  app.innerHTML = h + `<footer class="foot"><span>ETF 市场温度计 · 温度描述市场状态，不构成投资建议。</span><span class="mono">${D.meta.n_selected ?? D.meta.n_etfs} ETFs · ${D.meta.n_nodes} nodes · as of ${D.meta.asof}</span></footer>`;
+  if (view === "node" && N[current]?.hist) attachHist(histChart(current));
+}
+go("overview");
+})();
+</script>
+<!--APP-END-->
+</body>
+</html>
