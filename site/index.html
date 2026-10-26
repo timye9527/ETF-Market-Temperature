@@ -84,6 +84,10 @@ nav button:hover { color: var(--ink); }
 .dist-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink-3); }
 .dist-legend b { color: var(--ink-2); font-weight: 500; }
 .dist-sum { margin: 0; font-size: 14px; color: var(--ink-2); max-width: 70ch; }
+.weekly { display: grid; gap: 6px; }
+.weekly p { margin: 0; max-width: 75ch; color: var(--ink-2); }
+.weekly p:first-child { color: var(--ink); font-weight: 500; }
+.weekly p:last-child { font-size: 12px; color: var(--ink-3); }
 /* 为什么是这个温度 */
 .why { margin-top: 14px; padding: 14px 16px; border-left: 3px solid var(--accent); background: var(--surface); border-radius: 0 var(--r) var(--r) 0; display: grid; gap: 6px; }
 .why .eyebrow { margin: 0; }
@@ -402,6 +406,11 @@ app.addEventListener("click", e => {
   const hm = e.target.closest("[data-hmode]"); if (hm) { histMode = hm.dataset.hmode; render(); return; }
   const pb = e.target.closest("[data-pool]"); if (pb) { poolBucket = pb.dataset.pool; render(); return; }
   const rc = e.target.closest("[data-rcls]"); if (rc) { resCls = rc.dataset.rcls; render(); return; }
+  const cs = e.target.closest("[data-copysum]"); if (cs) {
+    const txt = weeklyLines(Object.entries(N).filter(([, n]) => n.temp != null && n.mode === "DIRECTIONAL")).join("\n") + "\n" + location.href.split("#")[0];
+    navigator.clipboard?.writeText(txt).then(() => { cs.textContent = "已复制"; setTimeout(() => { cs.textContent = "复制这段文字"; }, 1800); }, () => prompt("复制这段文字", txt));
+    return;
+  }
   const db = e.target.closest("[data-dist]"); if (db) { distBand = distBand === db.dataset.dist ? null : db.dataset.dist; render(); return; }
   const cp = e.target.closest("[data-copy]"); if (cp) {
     const done = () => { cp.textContent = "已复制链接"; setTimeout(() => { cp.textContent = "复制本页链接"; }, 1800); };
@@ -512,6 +521,31 @@ function distribution(all) {
     <p class="dist-sum">${tone}：${cold} 个板块在 40° 以下，${warm} 个在 60° 以上，中位数 ${fmt(med)}°。</p></div></section>`;
 }
 
+// 本周温度小结：把一周的变化写成一段能直接复制的文字
+function weeklyLines(all) {
+  const us = N["EQUITY/US"], r = D.risk, k = all.length;
+  if (!us || !k) return [];
+  const rb = r.score == null ? "" : r.score >= 60 ? "偏 Risk-on" : r.score <= 40 ? "偏 Risk-off" : "中性";
+  const temps = all.map(([, n]) => n.temp).sort((a, b) => a - b), med = temps[Math.floor(k / 2)];
+  const cold = all.filter(([, n]) => n.temp < 40).length, warm = all.filter(([, n]) => n.temp >= 60).length;
+  const mv = all.filter(([, n]) => n.d5 != null).sort((a, b) => b[1].d5 - a[1].d5);
+  const nm = ([id, n]) => `${zh(id)} ${sgn(n.d5)}°（现 ${fmt(n.temp)}°）`;
+  const ext = c => all.filter(([, n]) => n.band === c).map(([id, n]) => `${zh(id)} ${fmt(n.temp)}°${n.checklist?.confirmed ? "（已确认）" : ""}`);
+  const L = [`截至 ${D.meta.asof} 美东收盘，美股温度 ${fmt(us.temp)}°（${BAND[us.band][0]}），一周 ${sgn(us.d5)}°；风险偏好 ${fmt(r.score)}${rb ? `（${rb}）` : ""}，一周 ${sgn(r.d5)}。`,
+    `${k} 个板块里，${cold} 个在 40° 以下，${warm} 个在 60° 以上，中位数 ${fmt(med)}°。`,
+    `一周升温最快：${mv.slice(0, 3).map(nm).join("、")}。`,
+    `一周降温最快：${mv.slice(-3).reverse().map(nm).join("、")}。`];
+  const hot = ext("EXTREME_HOT"), ice = ext("EXTREME_COLD");
+  if (hot.length || ice.length) L.push([hot.length ? `极热区（≥95°）：${hot.join("、")}` : "", ice.length ? `极冷区（≤5°）：${ice.join("、")}` : ""].filter(Boolean).join("；") + "。");
+  L.push("温度 = 离自己趋势有多远，描述市场状态，不构成投资建议。");
+  return L;
+}
+function weekly(all) {
+  const L = weeklyLines(all); if (!L.length) return "";
+  return `<section class="sec"><div class="sec-h"><h2>本周温度小结</h2><span class="muted">按最近 5 个交易日自动生成</span><button class="copy" style="margin:0 0 0 auto" data-copysum>复制这段文字</button></div>
+    <div class="panel weekly">${L.map(l => `<p>${esc(l)}</p>`).join("")}</div></section>`;
+}
+
 function overview() {
   const us = N["EQUITY/US"], r = D.risk;
   const rb = r.score == null ? null : r.score >= 60 ? "Risk-on 偏向" : r.score <= 40 ? "Risk-off 偏向" : "中性";
@@ -543,6 +577,7 @@ function overview() {
     </div>
   </section>
   ${distribution(all)}
+  ${weekly(all)}
   <section class="sec">
     <div class="sec-h"><h2>温度板</h2><span class="muted">温度 = 相对自身趋势的冷热，自身 5 年百分位 · 副标题 = 趋势状态 · 周期资格（* 待复核）</span></div>
     <div class="board">${BOARD.map(([title, ids]) => `<div class="group"><h3>${title}</h3>${ids.map(row).join("")}</div>`).join("")}</div>
