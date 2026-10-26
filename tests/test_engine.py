@@ -133,6 +133,23 @@ class YahooParseTest(unittest.TestCase):
         self.assertEqual(df["close"].iloc[-1], 11.0)
         self.assertEqual(df["adj_close"].iloc[-1], 10.5)
 
+    def test_lagging_series_gets_session_from_meta(self):
+        # 2025-10-05 and 10-06 bars; meta already carries the 10-07 close (16:00 ET)
+        payload = {"chart": {"result": [{"timestamp": [1759671000, 1759757400],
+                   "meta": {"regularMarketTime": 1759867200, "regularMarketPrice": 12.0,
+                            "regularMarketDayHigh": 12.5, "regularMarketDayLow": 11.5, "regularMarketVolume": 300,
+                            "exchangeTimezoneName": "America/New_York"},
+                   "indicators": {"quote": [{"open": [1, 2], "high": [1, 2], "low": [1, 2],
+                                             "close": [10.0, 11.0], "volume": [100, 200]}],
+                                  "adjclose": [{"adjclose": [9.5, 10.5]}]}}]}}
+        df = parse_yahoo_chart(payload)
+        self.assertEqual(df.index[-1], pd.Timestamp("2025-10-07"))
+        self.assertEqual(df["close"].iloc[-1], 12.0)
+        self.assertEqual(df["volume"].iloc[-1], 300)
+        # already up to date: nothing appended
+        payload["chart"]["result"][0]["meta"]["regularMarketTime"] = 1759780800  # 10-06 16:00 ET
+        self.assertEqual(len(parse_yahoo_chart(payload)), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

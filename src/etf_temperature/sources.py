@@ -31,7 +31,29 @@ def parse_yahoo_chart(payload: dict) -> pd.DataFrame:
     )
     df.index.name = "date"
     df = df[~df.index.duplicated(keep="last")].dropna(subset=["close"])
+    df = _append_meta_bar(df, res.get("meta") or {})
     return df[COLUMNS].astype(float)
+
+
+def _append_meta_bar(df: pd.DataFrame, meta: dict) -> pd.DataFrame:
+    """Yahoo's multi-year daily series can lag a session behind for hours after the close
+    (the daily build ran at 21:00 ET on 10-23 and got bars only to 10-22), while `meta`
+    already carries that session's close, range and volume. Append it as the missing bar.
+    Open isn't in `meta` and nothing downstream reads it. An unfinished session appended
+    here is still removed by _drop_unfinished_session."""
+    from zoneinfo import ZoneInfo
+
+    t, px = meta.get("regularMarketTime"), meta.get("regularMarketPrice")
+    if not t or px is None:
+        return df
+    tz = ZoneInfo(meta.get("exchangeTimezoneName") or "America/New_York")
+    day = pd.Timestamp(datetime.fromtimestamp(t, tz=tz).date())
+    if len(df) and day <= df.index[-1]:
+        return df
+    bar = pd.DataFrame({"open": [np.nan], "high": [meta.get("regularMarketDayHigh", px)],
+                        "low": [meta.get("regularMarketDayLow", px)], "close": [px], "adj_close": [px],
+                        "volume": [meta.get("regularMarketVolume")]}, index=pd.DatetimeIndex([day], name="date"))
+    return pd.concat([df, bar])
 
 
 def parse_stooq_csv(text: str) -> pd.DataFrame:

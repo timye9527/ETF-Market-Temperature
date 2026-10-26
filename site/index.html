@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ETF 市场温度计</title>
+<meta name="description" content="用 200 多只 ETF 给全球市场 116 个板块量体温：每个板块 0–100°，看它离自己的趋势有多远。每个交易日美东收盘后更新。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="ETF 市场温度计">
+<meta property="og:description" content="全球市场 116 个板块的冷热，每个交易日更新。温度描述市场状态，不构成投资建议。">
+<meta property="og:url" content="https://timye9527.github.io/ETF-Market-Temperature/">
+<meta property="og:image" content="https://timye9527.github.io/ETF-Market-Temperature/og.png">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&display=swap">
@@ -60,6 +67,31 @@ nav button { border: 0; background: none; padding: 6px 12px; border-radius: var(
 nav button[aria-current="true"] { background: var(--surface-2); color: var(--ink); font-weight: 500; }
 nav button:hover { color: var(--ink); }
 .asof { font: 12px var(--f-mono); color: var(--ink-3); }
+@media (max-width: 640px) {
+  .top .wrap { gap: 6px 12px; }
+  nav { flex-wrap: nowrap; overflow-x: auto; width: 100%; scrollbar-width: none; margin-inline: -4px; }
+  nav::-webkit-scrollbar { display: none; }
+  nav button { white-space: nowrap; flex: none; }
+}
+/* 全市场温度分布 */
+.dist { display: grid; gap: 8px; }
+.dist-bar { display: flex; height: 30px; border-radius: var(--r); overflow: hidden; background: var(--surface-2); }
+.dist-bar button { display: grid; place-items: center; min-width: 0; border: 0; padding: 0; color: #fff; font: 600 13px var(--f-mono); cursor: pointer; }
+.dist-bar button.lt { color: var(--ink); }
+.dist-bar button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--ink); }
+.dist-list { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; padding: 10px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); font-size: 13px; }
+.dist-list b { font-weight: 600; margin-right: 4px; }
+.dist-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink-3); }
+.dist-legend b { color: var(--ink-2); font-weight: 500; }
+.dist-sum { margin: 0; font-size: 14px; color: var(--ink-2); max-width: 70ch; }
+/* 为什么是这个温度 */
+.why { margin-top: 14px; padding: 14px 16px; border-left: 3px solid var(--accent); background: var(--surface); border-radius: 0 var(--r) var(--r) 0; display: grid; gap: 6px; }
+.why .eyebrow { margin: 0; }
+.why p { margin: 0; color: var(--ink); max-width: 72ch; }
+.why ul { margin: 0; padding-left: 1.2em; color: var(--ink-2); font-size: 14px; display: grid; gap: 2px; }
+.crumb-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.copy { border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); border-radius: var(--r); padding: 3px 10px; font-size: 12px; cursor: pointer; margin-top: 20px; }
+.copy:hover { color: var(--ink); }
 
 .demo { margin-top: 16px; border: 1px solid var(--demo-line); background: var(--demo-bg); color: var(--demo-ink); border-radius: var(--r); padding: 10px 14px; font-size: 13px; }
 .demo b { font-weight: 700; }
@@ -340,12 +372,28 @@ function spark(vals, w = 90, h = 26) {
     <circle cx="${x(last[0])}" cy="${y(last[1])}" r="2.6" fill="${tcol(bandOf(last[1]))}" stroke="var(--surface)" stroke-width="1"/></svg>`;
 }
 
+let distBand = null;
 let view = "overview", current = null, histRange = 126, rotK = 5, histMode = "v2", poolBucket = "ALL", resCls = "ALL";
-function go(v, node) {
+// 每个页面一个网址：#/rotation、#/n/<节点>，能转发、能后退
+const VIEWS = ["overview", "rotation", "tree", "pool", "research", "method"];
+const hashFor = (v, node) => v === "node" ? "#/n/" + node : v === "overview" ? "#/" : "#/" + v;
+function parseHash() {
+  const h = decodeURIComponent(location.hash.replace(/^#\/?/, ""));
+  if (h.startsWith("n/") && N[h.slice(2)]) return ["node", h.slice(2)];
+  return [VIEWS.includes(h) ? h : "overview", null];
+}
+function show(v, node) {
   view = v; current = node || null;
   document.querySelectorAll("#nav button").forEach(b => b.setAttribute("aria-current", String(b.dataset.view === v)));
+  const nv = N[current];
+  document.title = v === "node" && nv ? `${zh(current)} ${fmt(nv.temp)}° · ETF 市场温度计` : "ETF 市场温度计";
   render(); window.scrollTo({ top: 0 });
 }
+function go(v, node) {
+  const h = hashFor(v, node);
+  if (location.hash !== h) location.hash = h; else show(v, node);
+}
+window.addEventListener("hashchange", () => show(...parseHash()));
 document.getElementById("nav").addEventListener("click", e => { const b = e.target.closest("button"); if (b) go(b.dataset.view); });
 app.addEventListener("click", e => {
   const t = e.target.closest("[data-node]"); if (t && !t.classList.contains("disabled")) { go("node", t.dataset.node); return; }
@@ -353,10 +401,52 @@ app.addEventListener("click", e => {
   const k = e.target.closest("[data-rotk]"); if (k) { rotK = +k.dataset.rotk; render(); return; }
   const hm = e.target.closest("[data-hmode]"); if (hm) { histMode = hm.dataset.hmode; render(); return; }
   const pb = e.target.closest("[data-pool]"); if (pb) { poolBucket = pb.dataset.pool; render(); return; }
-  const rc = e.target.closest("[data-rcls]"); if (rc) { resCls = rc.dataset.rcls; render(); }
+  const rc = e.target.closest("[data-rcls]"); if (rc) { resCls = rc.dataset.rcls; render(); return; }
+  const db = e.target.closest("[data-dist]"); if (db) { distBand = distBand === db.dataset.dist ? null : db.dataset.dist; render(); return; }
+  const cp = e.target.closest("[data-copy]"); if (cp) {
+    const done = () => { cp.textContent = "已复制链接"; setTimeout(() => { cp.textContent = "复制本页链接"; }, 1800); };
+    navigator.clipboard?.writeText(location.href).then(done, () => { prompt("复制这个链接", location.href); });
+  }
 });
-document.getElementById("asof").textContent = `数据截至 ${D.meta.asof} · ${D.meta.mode === "DEMO" ? "演示数据" : D.meta.source}`;
+document.getElementById("asof").textContent = D.meta.mode === "DEMO" ? `演示数据 · ${D.meta.asof}` : `数据截至 ${D.meta.asof} 美东收盘 · 每个交易日更新`;
 const demoBanner = () => D.meta.mode !== "DEMO" ? "" : `<div class="demo" role="note"><b>演示数据</b>：本页数字由模拟行情生成，用来展示温度引擎和页面功能，<b>不代表真实市场</b>。</div>`;
+
+// 用一段话讲清这个温度从哪来：趋势背景 + 最拉动温度的两个维度 + 反向的那个
+const FACT_SAY = {
+  stretch: [n => `价格远高于自己的趋势线${n.sub?.z252 != null ? `（偏离 ${sgn(n.sub.z252, 1)} 个标准差）` : ""}`,
+            n => `价格跌到自己的趋势线下方很远${n.sub?.z252 != null ? `（偏离 ${sgn(n.sub.z252, 1)} 个标准差）` : ""}`],
+  accel: [() => "近一个月涨得比趋势应有的更快，在加速", () => "近一个月跌得比趋势应有的更快，在加速下跌"],
+  crowding: [() => "成交和杠杆资金明显偏向做多，交易拥挤", () => "成交偏向卖出、杠杆资金在撤，交易冷清"],
+  breadth: [n => `多数成分走强${n.sub?.above50 != null ? `，${fmt(n.sub.above50)}% 站上 50 日线` : ""}`,
+            n => `多数成分走弱${n.sub?.above50 != null ? `，只有 ${fmt(n.sub.above50)}% 站上 50 日线` : ""}`],
+  rs: [n => `相对${n.rs_benchmark ? zh(n.rs_benchmark) : "上级板块"}明显走强`, n => `相对${n.rs_benchmark ? zh(n.rs_benchmark) : "上级板块"}明显走弱`],
+};
+const FACT_NAME = Object.fromEntries(FACT.map(([k, nm]) => [k, nm]));
+function explain(id) {
+  const n = N[id]; if (!n || n.temp == null || !n.factors) return "";
+  const t = n.temp, hot = t >= 60, cold = t < 40, st = n.trend?.state;
+  const up = st === "UP" || st === "STRONG_UP", down = st === "DOWN" || st === "STRONG_DOWN";
+  const ctx = up && cold ? "长期趋势向上，但短期跌得比趋势快，处在上升趋势里的回调段"
+    : up && hot ? "长期趋势向上，短期又在加速冲高"
+    : down && cold ? "长期趋势向下，短期还在继续走弱"
+    : down && hot ? "长期趋势向下，短期出现了一段明显反弹"
+    : up ? "长期趋势向上，短期基本贴着趋势走" : down ? "长期趋势向下，短期基本贴着趋势走"
+    : hot ? "没有明确的长期趋势，短期处在区间偏高的位置" : cold ? "没有明确的长期趋势，短期处在区间偏低的位置" : "没有明确的长期趋势，短期也不冷不热";
+  const fs = Object.entries(n.factors).filter(([, v]) => v != null);
+  const ranked = fs.slice().sort((a, b) => Math.abs(b[1] - 50) - Math.abs(a[1] - 50));
+  const lead = ranked.filter(([, v]) => hot ? v >= 60 : cold ? v < 40 : Math.abs(v - 50) >= 15).slice(0, 3);
+  const against = ranked.find(([, v]) => hot ? v < 40 : cold ? v >= 60 : false);
+  const say = ([k, v]) => (FACT_SAY[k] || [() => FACT_NAME[k] + "偏高", () => FACT_NAME[k] + "偏低"])[v >= 50 ? 0 : 1](n);
+  const trendTxt = n.trend?.ann != null ? `（1 年趋势年化 ${sgn(n.trend.ann, 0)}%）` : "";
+  let p = `<b>${esc(zh(id))} ${fmt(t)}°，${BAND[n.band][0]}。</b>${ctx}${trendTxt}。`;
+  if (n.d5 != null && Math.abs(n.d5) >= 3) p += ` 比 5 个交易日前${n.d5 > 0 ? "升" : "降"}了 ${fmt(Math.abs(n.d5))}°。`;
+  const items = [];
+  if (lead.length) items.push(`${hot ? "推高" : cold ? "压低" : "影响最大的"}温度的主要是：${lead.map(say).join("；")}。`);
+  if (against) items.push(`反方向的是：${say(against)}，拉住了温度。`);
+  const ck = n.checklist;
+  if (ck && (ck.hot_count >= 2 || ck.cold_count >= 2)) items.push(`极端确认清单：${ck.hot_count >= ck.cold_count ? `过热 ${ck.hot_count}/6` : `过冷 ${ck.cold_count}/6`}${ck.confirmed ? "，已确认" : "，满 3 条且持续 3 日才算确认"}。`);
+  return `<div class="why"><div class="eyebrow">为什么是这个温度</div><p>${p}</p>${items.length ? `<ul>${items.map(i => `<li>${esc(i)}</li>`).join("")}</ul>` : ""}</div>`;
+}
 
 function row(id) {
   const n = N[id]; if (!n) return "";
@@ -383,19 +473,43 @@ function quadrant(ids) {
         <text x="${x(X) - 6}" y="${y(100) + 14}" text-anchor="end" class="ql">过热</text><text x="${x(X) - 6}" y="${y(50) - 6}" text-anchor="end" class="ql">健康上涨</text>
         <text x="${x(-X) + 6}" y="${y(0) - 8}" class="ql">超卖</text><text x="${x(-X) + 6}" y="${y(50) - 6}" class="ql">阴跌</text>`;
   // Label only the readings that matter (extremes, strong trends); the rest stay on hover.
-  const placed = [];
   const notable = n => n.temp >= 80 || n.temp <= 20 || Math.abs(n.trend.ann) >= 30 || n.checklist?.confirmed;
-  for (const [id, n] of pts) {
-    const cx = x(n.trend.ann), cy = y(n.temp), right = cx > W - 140;
-    let label = "";
-    if (notable(n) && !placed.some(([px, py]) => Math.abs(px - cx) < 70 && Math.abs(py - cy) < 13)) {
-      placed.push([cx, cy]);
-      label = `<text x="${right ? cx - 9 : cx + 9}" y="${cy + 4}" text-anchor="${right ? "end" : "start"}" class="qn">${esc(zh(id))}</text>`;
-    }
+  const dots = pts.map(([, n]) => [x(n.trend.ann), y(n.temp)]);
+  const boxes = [], hit = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+  // 越极端越先放标签
+  const order = pts.map((p, i) => i).sort((i, j) => Math.abs(pts[j][1].temp - 50) + Math.abs(pts[j][1].trend.ann) / 2 - Math.abs(pts[i][1].temp - 50) - Math.abs(pts[i][1].trend.ann) / 2);
+  const labels = {};
+  for (const i of order) {
+    const [id, n] = pts[i]; if (!notable(n)) continue;
+    const [cx, cy] = dots[i], txt = zh(id), w = [...txt].reduce((s, c) => s + (c.charCodeAt(0) > 255 ? 11 : 6.2), 0), h = 13;
+    const cands = [[cx + 9, cy + 4, "start", [cx + 9, cy - 8, cx + 9 + w, cy + 5]], [cx - 9, cy + 4, "end", [cx - 9 - w, cy - 8, cx - 9, cy + 5]],
+      [cx, cy - 10, "middle", [cx - w / 2, cy - 10 - h + 3, cx + w / 2, cy - 7]], [cx, cy + 19, "middle", [cx - w / 2, cy + 8, cx + w / 2, cy + 21]]];
+    const ok = cands.find(([, , , bx]) => bx[0] >= l && bx[2] <= W - r && bx[1] >= t && bx[3] <= t + ih
+      && !boxes.some(o => hit(o, bx)) && !dots.some(([dx, dy], k) => k !== i && hit([dx - 6, dy - 6, dx + 6, dy + 6], bx)));
+    if (ok) { boxes.push(ok[3]); labels[i] = `<text x="${ok[0]}" y="${ok[1]}" text-anchor="${ok[2]}" class="qn">${esc(txt)}</text>`; }
+  }
+  for (const [i, [id, n]] of pts.entries()) {
+    const [cx, cy] = dots[i], label = labels[i] || "";
     s += `<g data-node="${esc(id)}" style="cursor:pointer"><circle cx="${cx}" cy="${cy}" r="6" fill="${tcol(n.band)}" stroke="var(--surface)" stroke-width="2"/>
       ${label}<title>${esc(zh(id))}：温度 ${fmt(n.temp)}°，趋势 ${sgn(n.trend.ann, 1)}%</title></g>`;
   }
   return s + "</svg>";
+}
+
+function distribution(all) {
+  if (!all.length) return "";
+  const bands = D.meta.bands.map(b => b.code), cnt = Object.fromEntries(bands.map(b => [b, []]));
+  for (const [id, n] of all) if (cnt[n.band]) cnt[n.band].push(id);
+  const k = all.length, temps = all.map(([, n]) => n.temp).sort((a, b) => a - b), med = temps[Math.floor(k / 2)];
+  const cold = all.filter(([, n]) => n.temp < 40).length, warm = all.filter(([, n]) => n.temp >= 60).length;
+  const tone = cold > warm * 1.5 ? "整体偏冷" : warm > cold * 1.5 ? "整体偏热" : "冷热各半";
+  const seg = bands.map((b, i) => { const c = cnt[b].length; if (!c) return "";
+    return `<button type="button" data-dist="${b}" aria-pressed="${distBand === b}" style="flex:${c};background:var(--t${i})" class="${i === 3 || i === 2 || i === 4 ? "lt" : ""}" title="${BAND[b][0]} ${c} 个，点开看名单">${c / k >= .04 ? c : ""}</button>`; }).join("");
+  const pick = distBand && cnt[distBand]?.length ? `<div class="dist-list"><b>${BAND[distBand][0]}（${cnt[distBand].length} 个）</b>${cnt[distBand].sort((a, b) => N[a].temp - N[b].temp).map(id => `<button class="linkish" data-node="${esc(id)}">${esc(zh(id))} <span class="num muted">${fmt(N[id].temp)}°</span></button>`).join("")}</div>` : "";
+  return `<section class="sec"><div class="sec-h"><h2>全市场温度分布</h2><span class="muted">${k} 个方向型板块 · 点色块看名单</span></div>
+    <div class="dist"><div class="dist-bar" role="img" aria-label="各温度区间的板块数">${seg}</div>
+    ${pick}<div class="dist-legend">${bands.map((b, i) => `<span><i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--t${i});margin-right:4px"></i>${BAND[b][0]} <b>${cnt[b].length}</b></span>`).join("")}</div>
+    <p class="dist-sum">${tone}：${cold} 个板块在 40° 以下，${warm} 个在 60° 以上，中位数 ${fmt(med)}°。</p></div></section>`;
 }
 
 function overview() {
@@ -428,6 +542,7 @@ function overview() {
         <div class="minibar" title="${esc(c.pair)} ${fmt(c.value)}"><b style="width:${c.value ?? 0}%;background:${tcol(bandOf(c.value))}"></b></div>`).join("")}</div>
     </div>
   </section>
+  ${distribution(all)}
   <section class="sec">
     <div class="sec-h"><h2>温度板</h2><span class="muted">温度 = 相对自身趋势的冷热，自身 5 年百分位 · 副标题 = 趋势状态 · 周期资格（* 待复核）</span></div>
     <div class="board">${BOARD.map(([title, ids]) => `<div class="group"><h3>${title}</h3>${ids.map(row).join("")}</div>`).join("")}</div>
@@ -582,11 +697,12 @@ function nodeView(id) {
       let v = t.value; if (k === "T3" && v) v = `冷 ${v.cold_n} 次 ${sgn(v.cold_med120, 1)}% · 热 ${v.hot_n} 次 ${sgn(v.hot_med120, 1)}%`; else if (k === "T1" && v != null) v = `${sgn(v, 1)}%/年`; else if (k === "T4" && v != null) v = `${sgn(v, 1)}%/年`;
       return `<div class="ck-i"><span>${k} ${esc(t.label)}</span><span class="mono" style="font-size:11.5px">${esc(v ?? "")}</span><span class="${t.pass ? "ok" : "warn"}">${t.pass ? "通过" : "未通过"}</span><span></span></div>`; }).join("")}</div></div>`;
   return demoBanner() + `
-  <nav class="crumbs" aria-label="层级">${crumbs.map((c, i) => `${i ? "<span>›</span>" : ""}<button data-node="${esc(c)}">${esc(zh(c))}</button>`).join("")}</nav>
+  <div class="crumb-row"><nav class="crumbs" aria-label="层级">${crumbs.map((c, i) => `${i ? "<span>›</span>" : ""}<button data-node="${esc(c)}">${esc(zh(c))}</button>`).join("")}</nav><button class="copy" data-copy>复制本页链接</button></div>
   <div class="detail-head"><div><h1>${esc(zh(id))}</h1><div class="muted mono" style="overflow-wrap:anywhere">${esc(en(id))} · ${esc(id)}</div>
     <div class="facts">${chip(n.band)}${trendChip(n)}${clsChip(n)}${confMark(n)}<span class="chip">短期温度 ${fmt(n.temp_short)}</span>${n.rs_benchmark ? `<button class="chip" data-node="${esc(n.rs_benchmark)}" style="border:0;cursor:pointer">RS 基准：${esc(zh(n.rs_benchmark))}</button>` : ""}${n.backfilled_until ? `<span class="chip" title="上市前历史由持仓股票合成">${esc(n.backfilled_until)} 前为合成回填</span>` : ""}</div></div>
     <div class="reading"><div class="big num">${fmt(n.temp)}<sup>°</sup></div>
       <div class="reading-meta"><span class="delta num ${deltaCls(n.d1)}">1 日 ${sgn(n.d1)}</span><span class="delta num ${deltaCls(n.d5)}">5 日 ${sgn(n.d5)}</span><span class="delta num ${deltaCls(n.d20)}">20 日 ${sgn(n.d20)}</span></div></div></div>
+  ${n.mode === "DIRECTIONAL" ? explain(id) : ""}
   ${n.note ? `<p class="muted" style="margin-top:10px">${esc(n.note)}</p>` : ""}
   ${n.mode === "DIRECTIONAL" ? `<section style="margin-top:18px">${actPanel}</section>` : ""}
   <section class="two" style="margin-top:16px">
@@ -661,7 +777,7 @@ function render() {
   app.innerHTML = h + `<footer class="foot"><span>ETF 市场温度计 · 温度描述市场状态，不构成投资建议。</span><span class="mono">${D.meta.n_selected ?? D.meta.n_etfs} ETFs · ${D.meta.n_nodes} nodes · as of ${D.meta.asof}</span></footer>`;
   if (view === "node" && N[current]?.hist) attachHist(histChart(current));
 }
-go("overview");
+show(...parseHash());
 })();
 </script>
 <!--APP-END-->

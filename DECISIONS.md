@@ -141,3 +141,6 @@ T1 长期回报 > 0、T2 ≥ 2 次 20% 回撤并 3 年内收复、T3 自身历�
 
 ### D-034 · 2026-10-06 · ACCEPTED — 多维度加权平均跳过缺失值（修复）
 真实数据首跑时，比特币、存储、半导体设备三个节点没有温度：加权平均把任一维度缺失当成整天缺失，而年轻 ETF（IBIT 2024 年、DRAM 2026 年）早期缺少动量加速或成交额读数。改为跳过缺失维度并对剩余权重重新归一；新增测试 `test_young_funds_still_get_a_temperature`。
+
+### D-035 · 2026-10-26 · ACCEPTED — 收盘后日线缺当天时用 meta 补一根（修复）
+线上数据一直比实际晚一个交易日：每日任务在美东 21:00 左右跑，雅虎 5 年日线那时还没把当天那根并进来（10-23 收盘后跑出 asof=10-22），但同一个响应的 `meta` 里已有当天的收盘价、最高、最低和成交量。`parse_yahoo_chart` 发现 `meta.regularMarketTime` 所在交易日晚于最后一根时，用 meta 补上这根（开盘价留空，下游不用）；盘中补上的未完成交易日仍由 `_drop_unfinished_session` 去掉。新增测试 `test_lagging_series_gets_session_from_meta`。
